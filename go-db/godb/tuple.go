@@ -19,9 +19,10 @@ const (
 	UnknownType DBType = iota //used internally, during parsing, because sometimes the type is unknown
 	IntType     DBType = iota
 	StringType  DBType = iota
+	TextType    DBType = iota
 )
 
-var typeNames map[DBType]string = map[DBType]string{IntType: "int", StringType: "string"}
+var typeNames map[DBType]string = map[DBType]string{IntType: "int", StringType: "string", TextType: "text"}
 
 // FieldType is the type of a field in a tuple, e.g., its name, table, and [godb.DBType].
 // TableQualifier may or may not be an emtpy string, depending on whether the table
@@ -115,6 +116,7 @@ func (desc *TupleDesc) merge(desc2 *TupleDesc) *TupleDesc {
 
 // Gives the byte size of a Tuple with the given TupleDesc desc
 func (desc *TupleDesc) sizeInBytes() int {
+	var numTexts int = 0
 	var numStrings int = 0
 	var numInts int = 0
 	for _, f := range desc.Fields {
@@ -123,11 +125,13 @@ func (desc *TupleDesc) sizeInBytes() int {
 			numInts += 1
 		case StringType:
 			numStrings += 1
+		case TextType:
+			numTexts += 1
 		default:
 			panic("Cannot get size in bytes for unknown field type.")
 		}
 	}
-	return StringLength*numStrings + IntSizeBytes*numInts
+	return StringLength*numStrings + IntSizeBytes*numInts + numTexts*TextSizeBytes
 }
 
 // ================== Tuple Methods ======================
@@ -150,7 +154,7 @@ type StringField struct {
 }
 
 // String field value
-type TextField struct {
+type EmbeddedStringField struct {
 	Value string
 	Emb   EmbeddingType
 }
@@ -181,6 +185,7 @@ type recordID interface{}
 // tuple.
 func (t *Tuple) writeTo(b *bytes.Buffer) error {
 	for i, f := range t.Fields {
+
 		switch f := f.(type) {
 		case StringField:
 			if t.Desc.Fields[i].Ftype != StringType {
@@ -192,11 +197,35 @@ func (t *Tuple) writeTo(b *bytes.Buffer) error {
 			if err != nil {
 				return err
 			}
+
 		case IntField:
 			if t.Desc.Fields[i].Ftype != IntType {
 				return GoDBError{TypeMismatchError, "Tuple's fields do not match its descriptor."}
 			}
 			err := binary.Write(b, binary.LittleEndian, &f.Value)
+			if err != nil {
+				return err
+			}
+
+		case EmbeddedStringField:
+
+			if t.Desc.Fields[i].Ftype != TextType {
+				return GoDBError{TypeMismatchError, "Tuple's fields do not match its descriptor."}
+			}
+
+			//Add embedding
+			for _, embValue := range f.Emb {
+				// copy(EmbeddingByte, []byte(embValue))
+				err := binary.Write(b, binary.LittleEndian, embValue)
+				if err != nil {
+					return err
+				}
+			}
+
+			//Add embedding
+			TextBytes := make([]byte, TextCharLength)
+			copy(TextBytes, []byte(f.Value))
+			err := binary.Write(b, binary.LittleEndian, TextBytes)
 			if err != nil {
 				return err
 			}
@@ -221,8 +250,11 @@ func (t *Tuple) writeTo(b *bytes.Buffer) error {
 
 func readTupleFrom(b *bytes.Buffer, desc *TupleDesc) (*Tuple, error) {
 	var stringBytes = make([]byte, StringLength)
+	var textBytes = make([]byte, TextCharLength)
 	var nextString string
 	var nextInt int64
+	var nextFloat float64
+	var nextText string
 
 	tupleFields := make([]DBValue, len(desc.Fields))
 	for i, f := range desc.Fields {
@@ -240,6 +272,26 @@ func readTupleFrom(b *bytes.Buffer, desc *TupleDesc) (*Tuple, error) {
 				return nil, err
 			}
 			tupleFields[i] = IntField{nextInt}
+
+		case TextType:
+
+			//Read embedding
+			var emb EmbeddingType
+			for i := 0; i < TextEmbeddingDim; i++ {
+				err := binary.Read(b, binary.LittleEndian, &nextFloat)
+				if err != nil {
+					return nil, err
+				}
+				emb = append(emb, nextFloat)
+			}
+
+			// Read
+			err := binary.Read(b, binary.LittleEndian, &textBytes)
+			if err != nil {
+				return nil, err
+			}
+			nextText = string(bytes.TrimRight(textBytes, "\x00"))
+			tupleFields[i] = EmbeddedStringField{Value: nextText, Emb: emb}
 		}
 	}
 	return &Tuple{Desc: *desc, Fields: tupleFields}, nil
@@ -250,13 +302,27 @@ func readTupleFrom(b *bytes.Buffer, desc *TupleDesc) (*Tuple, error) {
 // the [TupleDesc.equals] method, but fields can be compared directly with equality
 // operators.
 func (t1 *Tuple) equals(t2 *Tuple) bool {
+
 	if !t1.Desc.equals(&t2.Desc) {
 		return false
 	}
 
-	for i := range t1.Fields {
-		if t1.Fields[i] != t2.Fields[i] {
-			return false
+	for i, tdesc := range t1.Desc.Fields {
+		switch tdesc.Ftype {
+		case StringType:
+			if t1.Fields[i].(StringField).Value != t2.Fields[i].(StringField).Value {
+				return false
+			}
+
+		case IntType:
+			if t1.Fields[i].(IntField).Value != t2.Fields[i].(IntField).Value {
+				return false
+			}
+
+		case TextType:
+			if t1.Fields[i].(EmbeddedStringField).Value != t2.Fields[i].(EmbeddedStringField).Value {
+				return false
+			}
 		}
 	}
 
@@ -319,6 +385,16 @@ func (t *Tuple) compareField(t2 *Tuple, field Expr) (orderByState, error) {
 	case IntType:
 		v1 := e1.(IntField).Value
 		v2 := e2.(IntField).Value
+		if v1 < v2 {
+			return OrderedLessThan, nil
+		} else if v1 == v2 {
+			return OrderedEqual, nil
+		}
+		return OrderedGreaterThan, nil
+
+	case TextType:
+		v1 := e1.(EmbeddedStringField).Value
+		v2 := e2.(EmbeddedStringField).Value
 		if v1 < v2 {
 			return OrderedLessThan, nil
 		} else if v1 == v2 {
@@ -425,6 +501,8 @@ func (t *Tuple) PrettyPrintString(aligned bool) string {
 		case IntField:
 			str = fmt.Sprintf("%d", f.Value)
 		case StringField:
+			str = f.Value
+		case EmbeddedStringField:
 			str = f.Value
 		}
 		if aligned {

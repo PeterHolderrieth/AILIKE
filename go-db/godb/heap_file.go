@@ -100,29 +100,39 @@ func (f *HeapFile) LoadFromCSV(file *os.File, hasHeader bool, sep string, skipLa
 					field = field[0:StringLength]
 				}
 				newFields = append(newFields, StringField{field})
+			case TextType:
+				if len(field) > TextCharLength {
+					field = field[0:TextCharLength]
+				}
+				newFields = append(newFields, EmbeddedStringField{Value: field})
+			default:
+				return GoDBError{code: IncompatibleTypesError, errString: "(LoadFromCSV): Unknown type."}
 			}
 		}
 		newT := Tuple{*f.Descriptor(), newFields, nil}
 		tid := NewTID()
 		bp := f.bufPool
 		bp.BeginTransaction(tid)
+		fmt.Println("(LoadFromCSV): inserting tuple.")
+		fmt.Println("tuple: ", newT)
 		f.insertTuple(&newT, tid)
+		fmt.Println("(LoadFromCSV): Done inserting tuple.")
 
 		// hack to force dirty pages to disk
 		// because CommitTransaction may not be implemented
 		// yet if this is called in lab 1 or 2
-		for j := 0; j < f.NumPages(); j++ {
-			pg, err := bp.GetPage(f, j, tid, ReadPerm)
-			if pg == nil || err != nil {
-				fmt.Println("page nil or error", err)
-				break
-			}
-			if (*pg).isDirty() {
-				(*f).flushPage(pg)
-				(*pg).setDirty(false)
-			}
+		// for j := 0; j < f.NumPages(); j++ {
+		// 	pg, err := bp.GetPage(f, j, tid, ReadPerm)
+		// 	if pg == nil || err != nil {
+		// 		fmt.Println("page nil or error", err)
+		// 		break
+		// 	}
+		// 	if (*pg).isDirty() {
+		// 		(*f).flushPage(pg)
+		// 		(*pg).setDirty(false)
+		// 	}
 
-		}
+		// }
 
 		//commit frequently, to avoid all pages in BP being full
 		//todo fix
@@ -238,12 +248,26 @@ func (f *HeapFile) insertTuple(t *Tuple, tid TransactionID) error {
 		return err
 	}
 
+	//Create embedding for every text field:
+	for i, field := range t.Desc.Fields {
+		if field.Ftype == TextType {
+			EmbeddedStringField := t.Fields[i].(EmbeddedStringField)
+			embResp, err := generateEmbeddings(EmbeddedStringField.Value)
+			if err != nil {
+				return err
+			}
+			EmbeddedStringField.Emb = embResp.Embedding
+			t.Fields[i] = EmbeddedStringField
+		}
+	}
+
 	rid, err := hp.insertTuple(t)
 	if err != nil {
 		return err
 	}
 	t.Rid = rid
 	f.pageFull.Store(hp.pageNo, hp.numOpenSlots == 0)
+
 	return nil
 }
 

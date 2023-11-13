@@ -43,8 +43,67 @@ func makeTestVars() (TupleDesc, Tuple, Tuple, *HeapFile, *BufferPool, Transactio
 
 }
 
+func makeTextTestVars() (TupleDesc, Tuple, Tuple, *HeapFile, *BufferPool, TransactionID) {
+	var td = TupleDesc{Fields: []FieldType{
+		{Fname: "name", Ftype: StringType},
+		{Fname: "age", Ftype: IntType},
+		{Fname: "biography", Ftype: TextType},
+	}}
+
+	var t1 = Tuple{
+		Desc: td,
+		Fields: []DBValue{
+			StringField{"sam"},
+			IntField{25},
+			EmbeddedStringField{Value: "Albert, Sam is a video producer. He is passionate about producing awesome videos.",
+				Emb: nil}},
+	}
+
+	var t2 = Tuple{
+		Desc: td,
+		Fields: []DBValue{
+			StringField{"george jones"},
+			IntField{999},
+			EmbeddedStringField{Value: "George is a wedding photographer. He loves capturing the best headshots.",
+				Emb: nil},
+		}}
+
+	bp := NewBufferPool(3)
+	os.Remove(TestingFile)
+	hf, err := NewHeapFile(TestingFile, &td, bp)
+	if err != nil {
+		print("ERROR MAKING TEST VARS, BLARGH")
+		panic(err)
+	}
+
+	tid := NewTID()
+	bp.BeginTransaction(tid)
+
+	return td, t1, t2, hf, bp, tid
+
+}
+
 func TestCreateAndInsertHeapFile(t *testing.T) {
 	_, t1, t2, hf, _, tid := makeTestVars()
+	hf.insertTuple(&t1, tid)
+	hf.insertTuple(&t2, tid)
+
+	iter, _ := hf.Iterator(tid)
+	i := 0
+	for {
+		t, _ := iter()
+		if t == nil {
+			break
+		}
+		i = i + 1
+	}
+	if i != 2 {
+		t.Errorf("HeapFile iterator expected 2 tuples, got %d", i)
+	}
+}
+
+func TestTextCreateAndInsertHeapFile(t *testing.T) {
+	_, t1, t2, hf, _, tid := makeTextTestVars()
 	hf.insertTuple(&t1, tid)
 	hf.insertTuple(&t2, tid)
 
