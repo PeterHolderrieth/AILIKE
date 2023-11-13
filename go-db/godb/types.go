@@ -37,9 +37,14 @@ func (e GoDBError) Error() string {
 }
 
 const (
-	PageSize     int = 4096
-	StringLength int = 32
-	IntSizeBytes int = int(unsafe.Sizeof(int64(0)))
+	PageSize           int = 4096
+	StringLength       int = 32
+	TextEmbeddingDim   int = 768
+	TextCharLength     int = 300
+	FloatSizeBytes     int = int(unsafe.Sizeof(float64(0.0)))
+	EmbeddingSizeBytes int = TextEmbeddingDim * FloatSizeBytes
+	TextSizeBytes      int = EmbeddingSizeBytes + TextCharLength
+	IntSizeBytes       int = int(unsafe.Sizeof(int64(0)))
 )
 
 type Page interface {
