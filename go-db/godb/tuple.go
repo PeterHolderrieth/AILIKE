@@ -149,6 +149,12 @@ type StringField struct {
 	Value string
 }
 
+// String field value
+type TextField struct {
+	Value string
+	Emb   EmbeddingType
+}
+
 // Tuple represents the contents of a tuple read from a database
 // It includes the tuple descriptor, and the value of the fields
 type Tuple struct {
