@@ -43,7 +43,7 @@ app = Flask(__name__)
 
 @app.route('/dimemb', methods=['POST'])
 def get_embedding_dim():
-    model_dim = len(get_embedding("test_text"))  
+    model_dim = len(generate_embedding(sentence="testtext"))  
     return jsonify({'dimemb': model_dim})
 
 
@@ -54,4 +54,4 @@ def get_embedding():
     return jsonify({'embedding': embedding})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=7010)
+	app.run(host='0.0.0.0', port=7010)
