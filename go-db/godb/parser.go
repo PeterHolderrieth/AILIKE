@@ -395,7 +395,7 @@ func parseExpr(c *Catalog, expr sqlparser.Expr, alias string) (*LogicalSelectNod
 		exprList := make([]*LogicalSelectNode, 2)
 		exprList[0] = left
 		exprList[1] = right
-		outer := NewFuncSelectNode("AILIKE", exprList, alias)
+		outer := NewFuncSelectNode("ailike", exprList, alias)
 		return &outer, nil
 	case *sqlparser.ParenExpr:
 		return parseExpr(c, expr.Expr, alias)

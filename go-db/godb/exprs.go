@@ -78,7 +78,7 @@ type FuncType struct {
 
 var funcs = map[string]FuncType{
 	//note should all be lower case
-	"<->":                   {[]DBType{IntType, IntType}, IntType, testFunc},
+	"ailike":                {[]DBType{IntType, IntType}, IntType, testFunc},
 	"+":                     {[]DBType{IntType, IntType}, IntType, addFunc},
 	"-":                     {[]DBType{IntType, IntType}, IntType, minusFunc},
 	"*":                     {[]DBType{IntType, IntType}, IntType, timesFunc},
@@ -97,7 +97,7 @@ var funcs = map[string]FuncType{
 
 
 func testFunc(args []any) any {
-	fmt.Println()
+	fmt.Println("trying to test this!")
 	return args[0].(int64) + args[1].(int64)
 }
 
