@@ -464,10 +464,25 @@ func parseExpr(c *Catalog, expr sqlparser.Expr, alias string) (*LogicalSelectNod
 		if err != nil {
 			return nil, err
 		}
+
+		// if right.exprType == ExprConst{
+			
+		// }
+		fmt.Printf("t1: %T\n", left)
+		fmt.Println(*left)
 		right, err := parseExpr(c, expr.Right, "")
 		if err != nil {
 			return nil, err
 		}
+
+		fmt.Printf("t1: %T\n", right)
+		fmt.Println(*right)
+		if right.exprType == ExprConst{
+			fmt.Println("a constant")
+			// v := (*right).(ConstExpr)
+			// fmt.Println(v)
+		}
+
 		exprList := make([]*LogicalSelectNode, 2)
 		exprList[0] = left
 		exprList[1] = right
@@ -739,6 +754,10 @@ func (s *LogicalSelectNode) generateExpr(c *Catalog, inputDesc *TupleDesc, table
 		fieldName := *s.funcOp
 		if s.alias != "" {
 			fieldName = s.alias
+		}
+		fmt.Println(fieldName)
+		if fieldName == "ailike" {
+			fmt.Println("AILIKE detected")
 		}
 		exprs := make([]*Expr, len(s.args))
 		for i, lsn := range s.args {

@@ -78,7 +78,7 @@ type FuncType struct {
 
 var funcs = map[string]FuncType{
 	//note should all be lower case
-	"ailike":                {[]DBType{EmbeddedStringField, EmbeddedStringField}, IntType, ailikeFunc},
+	"ailike":                {[]DBType{EmbeddedStringType, EmbeddedStringType}, IntType, ailikeFunc},
 	"+":                     {[]DBType{IntType, IntType}, IntType, addFunc},
 	"-":                     {[]DBType{IntType, IntType}, IntType, minusFunc},
 	"*":                     {[]DBType{IntType, IntType}, IntType, timesFunc},
