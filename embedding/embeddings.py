@@ -57,7 +57,10 @@ app = Flask(__name__)
 
 @app.route('/dimemb', methods=['POST'])
 def get_embedding_dim():
-    return jsonify({'dimemb': MODEL_DIM})
+    if RANDOM_PROJ:
+        return jsonify({'dimemb': PROJ_DIM})
+    else:
+        return jsonify({'dimemb': MODEL_DIM})
 
 
 @app.route('/embed', methods=['POST'])
