@@ -16,13 +16,13 @@ import (
 type DBType int
 
 const (
-	UnknownType DBType = iota //used internally, during parsing, because sometimes the type is unknown
-	IntType     DBType = iota
-	StringType  DBType = iota
-	TextType    DBType = iota
+	UnknownType        DBType = iota //used internally, during parsing, because sometimes the type is unknown
+	IntType            DBType = iota
+	StringType         DBType = iota
+	EmbeddedStringType DBType = iota
 )
 
-var typeNames map[DBType]string = map[DBType]string{IntType: "int", StringType: "string", TextType: "text"}
+var typeNames map[DBType]string = map[DBType]string{IntType: "int", StringType: "string", EmbeddedStringType: "text"}
 
 // FieldType is the type of a field in a tuple, e.g., its name, table, and [godb.DBType].
 // TableQualifier may or may not be an emtpy string, depending on whether the table
@@ -125,7 +125,7 @@ func (desc *TupleDesc) sizeInBytes() int {
 			numInts += 1
 		case StringType:
 			numStrings += 1
-		case TextType:
+		case EmbeddedStringType:
 			numTexts += 1
 		default:
 			panic("Cannot get size in bytes for unknown field type.")
@@ -209,7 +209,7 @@ func (t *Tuple) writeTo(b *bytes.Buffer) error {
 
 		case EmbeddedStringField:
 
-			if t.Desc.Fields[i].Ftype != TextType {
+			if t.Desc.Fields[i].Ftype != EmbeddedStringType {
 				return GoDBError{TypeMismatchError, "Tuple's fields do not match its descriptor."}
 			}
 
@@ -221,7 +221,7 @@ func (t *Tuple) writeTo(b *bytes.Buffer) error {
 				}
 			}
 
-			//Add embedding
+			//Add text
 			TextBytes := make([]byte, TextCharLength)
 			copy(TextBytes, []byte(f.Value))
 			err := binary.Write(b, binary.LittleEndian, TextBytes)
@@ -272,7 +272,7 @@ func readTupleFrom(b *bytes.Buffer, desc *TupleDesc) (*Tuple, error) {
 			}
 			tupleFields[i] = IntField{nextInt}
 
-		case TextType:
+		case EmbeddedStringType:
 
 			//Read embedding
 			var emb EmbeddingType
@@ -317,8 +317,8 @@ func (t1 *Tuple) equals(t2 *Tuple) bool {
 			if t1.Fields[i].(IntField).Value != t2.Fields[i].(IntField).Value {
 				return false
 			}
-
-		case TextType:
+		//we assume embeddings will have equal value so we only check the text/value field
+		case EmbeddedStringType:
 			if t1.Fields[i].(EmbeddedStringField).Value != t2.Fields[i].(EmbeddedStringField).Value {
 				return false
 			}
@@ -391,7 +391,7 @@ func (t *Tuple) compareField(t2 *Tuple, field Expr) (orderByState, error) {
 		}
 		return OrderedGreaterThan, nil
 
-	case TextType:
+	case EmbeddedStringType:
 		v1 := e1.(EmbeddedStringField).Value
 		v2 := e2.(EmbeddedStringField).Value
 		if v1 < v2 {
