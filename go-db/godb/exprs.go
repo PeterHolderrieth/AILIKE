@@ -78,7 +78,7 @@ type FuncType struct {
 
 var funcs = map[string]FuncType{
 	//note should all be lower case
-	"ailike":                {[]DBType{TextType, TextType}, IntType, ailikeFunc},
+	"ailike":                {[]DBType{EmbeddedStringField, EmbeddedStringField}, IntType, ailikeFunc},
 	"+":                     {[]DBType{IntType, IntType}, IntType, addFunc},
 	"-":                     {[]DBType{IntType, IntType}, IntType, minusFunc},
 	"*":                     {[]DBType{IntType, IntType}, IntType, timesFunc},
@@ -97,7 +97,6 @@ var funcs = map[string]FuncType{
 
 
 func ailikeFunc(args []any) any {
-	fmt.Println("trying to test this!")
 	v1 := args[0].(EmbeddedStringField).Emb
 	v2 := args[1].(EmbeddedStringField).Emb
 
@@ -254,7 +253,7 @@ func (f *FuncExpr) EvalExpr(t *Tuple) (DBValue, error) {
 			argvals[i] = val.(IntField).Value
 		case StringType:
 			argvals[i] = val.(StringField).Value
-		case TextType:
+		case EmbeddedStringType:
 			argvals[i] = val.(EmbeddedStringField)
 		}
 	}
@@ -264,7 +263,7 @@ func (f *FuncExpr) EvalExpr(t *Tuple) (DBValue, error) {
 		return IntField{result.(int64)}, nil
 	case StringType:
 		return StringField{result.(string)}, nil
-	case TextType:
+	case EmbeddedStringType:
 		return IntField{result.(int64)}, nil //We have never have expressions that result in text fields.
 	}
 	return nil, GoDBError{ParseError, "unknown result type in function"}

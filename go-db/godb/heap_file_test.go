@@ -47,7 +47,7 @@ func makeTextTestVars() (TupleDesc, Tuple, Tuple, *HeapFile, *BufferPool, Transa
 	var td = TupleDesc{Fields: []FieldType{
 		{Fname: "name", Ftype: StringType},
 		{Fname: "age", Ftype: IntType},
-		{Fname: "biography", Ftype: TextType},
+		{Fname: "biography", Ftype: EmbeddedStringType},
 	}}
 
 	var t1 = Tuple{
@@ -56,7 +56,7 @@ func makeTextTestVars() (TupleDesc, Tuple, Tuple, *HeapFile, *BufferPool, Transa
 			StringField{"sam"},
 			IntField{25},
 			EmbeddedStringField{Value: "Albert, Sam is a video producer. He is passionate about producing awesome videos.",
-				Emb: nil}},
+				Emb: make([]float64, TextEmbeddingDim)}},
 	}
 
 	var t2 = Tuple{
@@ -65,7 +65,7 @@ func makeTextTestVars() (TupleDesc, Tuple, Tuple, *HeapFile, *BufferPool, Transa
 			StringField{"george jones"},
 			IntField{999},
 			EmbeddedStringField{Value: "George is a wedding photographer. He loves capturing the best headshots.",
-				Emb: nil},
+				Emb: make([]float64, TextEmbeddingDim)},
 		}}
 
 	bp := NewBufferPool(3)

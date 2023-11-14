@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/manya-bansal/sqlparser"
+	"github.com/xwb1989/sqlparser"
 )
 
 type LogicalFilterNode struct {
@@ -1358,7 +1358,7 @@ func processDDL(c *Catalog, ddl *sqlparser.DDL) (QueryType, error) {
 			case "varchar":
 				colType = StringType
 			case "embtext":
-				colType = TextType
+				colType = EmbeddedStringType
 			default:
 				return UnknownQueryType, GoDBError{ParseError, fmt.Sprintf("unsupported column type %s", col.Type.Type)}
 
@@ -1383,7 +1383,6 @@ func processDDL(c *Catalog, ddl *sqlparser.DDL) (QueryType, error) {
 
 func Parse(c *Catalog, query string) (QueryType, Operator, error) {
 	stmt, err := sqlparser.Parse(query)
-	fmt.Println(stmt)
 	if err != nil {
 		fmt.Println("unknown query type check")
 		return UnknownQueryType, nil, err

@@ -37,8 +37,6 @@ type HeapFile struct {
 // May return an error if the file cannot be opened or created.
 func NewHeapFile(fromFile string, td *TupleDesc, bp *BufferPool) (*HeapFile, error) {
 
-	//os.Remove(fromFile)
-
 	filePointer, err := os.OpenFile(fromFile, os.O_CREATE|os.O_RDWR, os.ModePerm)
 	if err != nil {
 		return nil, err
@@ -57,12 +55,10 @@ func (f *HeapFile) FileByteSize() int {
 	return int(fInfo.Size())
 }
 
+// Return the number of pages in the heap file
 func (f *HeapFile) NumPages() int {
-	fileInfo, err := f.filePointer.Stat()
-	if err != nil {
-		panic("Unable to get file info.")
-	}
-	fileSize := fileInfo.Size()
+
+	fileSize := f.FileByteSize()
 	if fileSize == 0 {
 		return 0
 	}
@@ -92,8 +88,6 @@ func (f *HeapFile) LoadFromCSV(file *os.File, hasHeader bool, sep string, skipLa
 			return GoDBError{MalformedDataError, "Descriptor was nil"}
 		}
 		if numFields != len(desc.Fields) {
-			fmt.Println("desc.Fields: ", desc.Fields)
-			fmt.Println("fields: ", fields)
 			return GoDBError{MalformedDataError, fmt.Sprintf("LoadFromCSV:  line %d (%s) does not have expected number of fields (expected %d, got %d)", cnt, line, len(f.Descriptor().Fields), numFields)}
 		}
 		if cnt == 1 && hasHeader {
@@ -115,7 +109,7 @@ func (f *HeapFile) LoadFromCSV(file *os.File, hasHeader bool, sep string, skipLa
 					field = field[0:StringLength]
 				}
 				newFields = append(newFields, StringField{field})
-			case TextType:
+			case EmbeddedStringType:
 				if len(field) > TextCharLength {
 					field = field[0:TextCharLength]
 				}
@@ -263,7 +257,7 @@ func (f *HeapFile) insertTuple(t *Tuple, tid TransactionID) error {
 
 	//Create embedding for every text field:
 	for i, field := range t.Desc.Fields {
-		if field.Ftype == TextType {
+		if field.Ftype == EmbeddedStringType {
 			EmbeddedStringField := t.Fields[i].(EmbeddedStringField)
 			embResp, err := generateEmbeddings(EmbeddedStringField.Value)
 			if err != nil {
@@ -351,6 +345,8 @@ func (f *HeapFile) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
 		return nil, nil
 	}
 	return func() (*Tuple, error) {
+		//fmt.Println("Calling heapFile iterator on: ", f.fileName)
+		//fmt.Println("Number of pages: ", f.NumPages())
 		var t *Tuple
 		t, err := tupleIter()
 		if err != nil {
@@ -361,6 +357,7 @@ func (f *HeapFile) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
 			nextPage, err := f.bufPool.GetPage(f, pageNo, tid, ReadPerm)
 			pageNo += 1
 			if err != nil {
+				fmt.Println("Getting error when getting page.")
 				return nil, err
 			}
 			hp := (*nextPage).(*heapPage) // don't like doing this
