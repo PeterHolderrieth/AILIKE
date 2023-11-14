@@ -78,7 +78,7 @@ type FuncType struct {
 
 var funcs = map[string]FuncType{
 	//note should all be lower case
-	"ailike":                {[]DBType{IntType, IntType}, IntType, testFunc},
+	"ailike":                {[]DBType{TextType, TextType}, IntType, ailikeFunc},
 	"+":                     {[]DBType{IntType, IntType}, IntType, addFunc},
 	"-":                     {[]DBType{IntType, IntType}, IntType, minusFunc},
 	"*":                     {[]DBType{IntType, IntType}, IntType, timesFunc},
@@ -96,9 +96,18 @@ var funcs = map[string]FuncType{
 }
 
 
-func testFunc(args []any) any {
+func ailikeFunc(args []any) any {
 	fmt.Println("trying to test this!")
-	return args[0].(int64) + args[1].(int64)
+	v1 := args[0].(EmbeddedStringField).Emb
+	v2 := args[1].(EmbeddedStringField).Emb
+
+	r, err := dotProduct(&v1, &v2);
+
+	if err != nil{
+		panic("Failed to compute dot product in AILIKE")
+	}
+
+	return int64(r)
 }
 
 func ListOfFunctions() string {
@@ -246,7 +255,7 @@ func (f *FuncExpr) EvalExpr(t *Tuple) (DBValue, error) {
 		case StringType:
 			argvals[i] = val.(StringField).Value
 		case TextType:
-			argvals[i] = val.(EmbeddedStringField).Value
+			argvals[i] = val.(EmbeddedStringField)
 		}
 	}
 	result := fType.f(argvals)
@@ -256,7 +265,7 @@ func (f *FuncExpr) EvalExpr(t *Tuple) (DBValue, error) {
 	case StringType:
 		return StringField{result.(string)}, nil
 	case TextType:
-		return StringField{result.(string)}, nil //We have never have expressions that result in text fields.
+		return IntField{result.(int64)}, nil //We have never have expressions that result in text fields.
 	}
 	return nil, GoDBError{ParseError, "unknown result type in function"}
 }
