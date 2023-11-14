@@ -79,12 +79,19 @@ func makeOrderByOrderingVars() (*HeapFile, Tuple, TupleDesc, *BufferPool) {
 }
 
 func TestSetDirty(t *testing.T) {
+
 	_, t1, _, hf, bp, _ := makeTestVars()
 	tid := NewTID()
+
 	bp.BeginTransaction(tid)
-	for i := 0; i < 308; i++ {
+
+	nTuplesperPage := PageSize / hf.desc.sizeInBytes()
+	nPages := bp.numPages
+
+	nTuplesInserted := nPages * nTuplesperPage
+	for i := 0; i < nTuplesInserted+2; i++ {
 		err := hf.insertTuple(&t1, tid)
-		if err != nil && (i == 306 || i == 307) {
+		if err != nil && (i == nTuplesInserted || i == nTuplesInserted+1) {
 			return
 		} else if err != nil {
 			t.Fatalf("%v", err)

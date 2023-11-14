@@ -142,11 +142,16 @@ func TestTransactions(t *testing.T) {
 }
 
 func transactionTestSetUpVarLen(t *testing.T, tupCnt int, pgCnt int) (*BufferPool, *HeapFile, TransactionID, TransactionID, Tuple, Tuple) {
-	_, t1, t2, hf, bp, _ := makeTestVars()
+
+	td, t1, t2, hf, bp, _ := makeTestVars()
+	if tupCnt < 0 {
+		nTuplesperPage := (PageSize-8)/td.sizeInBytes() - 2
+		tupCnt = nTuplesperPage * pgCnt
+	}
 
 	csvFile, err := os.Open(fmt.Sprintf("txn_test_%d_%d.csv", tupCnt, pgCnt))
 	if err != nil {
-		t.Fatalf("error opening test file")
+		t.Fatalf("error opening test file: %s | Did you change the PageSize? If yes, you need to create novel reference files.", err.Error())
 	}
 	hf.LoadFromCSV(csvFile, false, ",", false)
 	if hf.NumPages() != pgCnt {
@@ -161,7 +166,8 @@ func transactionTestSetUpVarLen(t *testing.T, tupCnt int, pgCnt int) (*BufferPoo
 }
 
 func transactionTestSetUp(t *testing.T) (*BufferPool, *HeapFile, TransactionID, TransactionID, Tuple) {
-	bp, hf, tid1, tid2, t1, _ := transactionTestSetUpVarLen(t, 300, 3)
+
+	bp, hf, tid1, tid2, t1, _ := transactionTestSetUpVarLen(t, -1, 3)
 	return bp, hf, tid1, tid2, t1
 }
 
