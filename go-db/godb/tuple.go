@@ -215,7 +215,6 @@ func (t *Tuple) writeTo(b *bytes.Buffer) error {
 
 			//Add embedding
 			for _, embValue := range f.Emb {
-				// copy(EmbeddingByte, []byte(embValue))
 				err := binary.Write(b, binary.LittleEndian, embValue)
 				if err != nil {
 					return err

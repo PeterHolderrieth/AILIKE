@@ -2,7 +2,6 @@ package godb
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 )
 
@@ -13,7 +12,6 @@ func CheckIfOutputMatches(f func() (*Tuple, error), ts []*Tuple) bool {
 		if t1 == nil {
 			break
 		}
-		//		fmt.Printf("%v\n", t1)
 		got := false
 		for _, t2 := range ts {
 			if t1.equals(t2) {
@@ -60,9 +58,8 @@ func TestTextTupleSerialization(t *testing.T) {
 		tup.writeTo(b)
 		t3, err := readTupleFrom(b, &td)
 		if err != nil {
-			t.Fatalf("Error loading tuple from saved buffer.")
+			t.Fatalf("Error loading tuple from saved buffer: %s", err.Error())
 		}
-		fmt.Println(t3)
 		if !t3.equals(&tup) {
 			t.Errorf("Serialization / deserialization doesn't result in identical tuple.")
 		}
