@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/xwb1989/sqlparser"
+	"github.com/manya-bansal/sqlparser"
 )
 
 type LogicalFilterNode struct {
@@ -382,6 +382,20 @@ func parseExpr(c *Catalog, expr sqlparser.Expr, alias string) (*LogicalSelectNod
 		exprList[0] = left
 		exprList[1] = right
 		outer := NewFuncSelectNode(opname, exprList, alias)
+		return &outer, nil
+	case *sqlparser.AilikeExpr:
+		left, err := parseExpr(c, expr.Left, "")
+		if err != nil {
+			return nil, err
+		}
+		right, err := parseExpr(c, expr.Right, "")
+		if err != nil {
+			return nil, err
+		}
+		exprList := make([]*LogicalSelectNode, 2)
+		exprList[0] = left
+		exprList[1] = right
+		outer := NewFuncSelectNode("AILIKE", exprList, alias)
 		return &outer, nil
 	case *sqlparser.ParenExpr:
 		return parseExpr(c, expr.Expr, alias)
@@ -1286,31 +1300,35 @@ func processDDL(c *Catalog, ddl *sqlparser.DDL) (QueryType, error) {
 
 func Parse(c *Catalog, query string) (QueryType, Operator, error) {
 	stmt, err := sqlparser.Parse(query)
+	fmt.Println(stmt)
 	if err != nil {
+		fmt.Println("unknown query type check")
 		return UnknownQueryType, nil, err
 	}
 	switch stmt := stmt.(type) {
 	case *sqlparser.Select:
 		plan, err := parseStatement(c, stmt)
 		if err != nil {
-			//fmt.Printf("Err: %s\n", err.Error())
+			fmt.Printf("Err: %s\n", err.Error())
 			return UnknownQueryType, nil, err
 		}
 		op, err := makePhysicalPlan(c, plan)
 		if err != nil {
-			//fmt.Printf("Err: %s\n", err.Error())
+			fmt.Printf("Err: %s\n", err.Error())
 			return UnknownQueryType, nil, err
 		}
 		return IteratorType, op, nil
 	case *sqlparser.Insert:
 		op, err := parseInsert(c, stmt)
 		if err != nil {
+			fmt.Println("unknown query type 2")
 			return UnknownQueryType, nil, err
 		}
 		return IteratorType, op, nil
 	case *sqlparser.Delete:
 		op, err := parseDelete(c, stmt)
 		if err != nil {
+			fmt.Println("unknown query type 3")
 			return UnknownQueryType, nil, err
 		}
 		return IteratorType, op, nil
@@ -1323,6 +1341,7 @@ func Parse(c *Catalog, query string) (QueryType, Operator, error) {
 	case *sqlparser.DDL:
 		qtype, err := processDDL(c, stmt)
 		if err != nil {
+			fmt.Println("unknown query type 4")
 			return UnknownQueryType, nil, err
 		} else {
 			return qtype, nil, nil

@@ -78,6 +78,7 @@ type FuncType struct {
 
 var funcs = map[string]FuncType{
 	//note should all be lower case
+	"<->":                   {[]DBType{IntType, IntType}, IntType, testFunc},
 	"+":                     {[]DBType{IntType, IntType}, IntType, addFunc},
 	"-":                     {[]DBType{IntType, IntType}, IntType, minusFunc},
 	"*":                     {[]DBType{IntType, IntType}, IntType, timesFunc},
@@ -92,6 +93,12 @@ var funcs = map[string]FuncType{
 	"epochtodatetimestring": {[]DBType{IntType}, StringType, dateString},
 	"imin":                  {[]DBType{IntType, IntType}, IntType, minFunc},
 	"imax":                  {[]DBType{IntType, IntType}, IntType, maxFunc},
+}
+
+
+func testFunc(args []any) any {
+	fmt.Println()
+	return args[0].(int64) + args[1].(int64)
 }
 
 func ListOfFunctions() string {
