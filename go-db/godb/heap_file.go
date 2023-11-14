@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -35,6 +36,7 @@ type HeapFile struct {
 // - bp: the BufferPool that is used to store pages read from the HeapFile
 // May return an error if the file cannot be opened or created.
 func NewHeapFile(fromFile string, td *TupleDesc, bp *BufferPool) (*HeapFile, error) {
+
 	filePointer, err := os.OpenFile(fromFile, os.O_CREATE|os.O_RDWR, os.ModePerm)
 	if err != nil {
 		return nil, err
@@ -43,13 +45,20 @@ func NewHeapFile(fromFile string, td *TupleDesc, bp *BufferPool) (*HeapFile, err
 	return &HeapFile{fileName: fromFile, desc: *td.copy(), bufPool: bp, filePointer: filePointer, pageFull: &pageFull}, nil
 }
 
+// Return the number of bytes in file
+func (f *HeapFile) FileByteSize() int {
+
+	fInfo, err := os.Stat(f.fileName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return int(fInfo.Size())
+}
+
 // Return the number of pages in the heap file
 func (f *HeapFile) NumPages() int {
-	fileInfo, err := f.filePointer.Stat()
-	if err != nil {
-		panic("Unable to get file info.")
-	}
-	fileSize := fileInfo.Size()
+
+	fileSize := f.FileByteSize()
 	if fileSize == 0 {
 		return 0
 	}
@@ -100,6 +109,13 @@ func (f *HeapFile) LoadFromCSV(file *os.File, hasHeader bool, sep string, skipLa
 					field = field[0:StringLength]
 				}
 				newFields = append(newFields, StringField{field})
+			case EmbeddedStringType:
+				if len(field) > TextCharLength {
+					field = field[0:TextCharLength]
+				}
+				newFields = append(newFields, EmbeddedStringField{Value: field})
+			default:
+				return GoDBError{code: IncompatibleTypesError, errString: "(LoadFromCSV): Unknown type."}
 			}
 		}
 		newT := Tuple{*f.Descriptor(), newFields, nil}
@@ -233,9 +249,23 @@ func (f *HeapFile) getPageForInsert(tid TransactionID) (*heapPage, error) {
 // worry about concurrent transactions modifying the Page or HeapFile.  We will
 // add support for concurrent modifications in lab 3.
 func (f *HeapFile) insertTuple(t *Tuple, tid TransactionID) error {
+
 	hp, err := f.getPageForInsert(tid)
 	if err != nil {
 		return err
+	}
+
+	//Create embedding for every text field:
+	for i, field := range t.Desc.Fields {
+		if field.Ftype == EmbeddedStringType {
+			EmbeddedStringField := t.Fields[i].(EmbeddedStringField)
+			embResp, err := generateEmbeddings(EmbeddedStringField.Value)
+			if err != nil {
+				return err
+			}
+			EmbeddedStringField.Emb = embResp.Embedding
+			t.Fields[i] = EmbeddedStringField
+		}
 	}
 
 	rid, err := hp.insertTuple(t)
@@ -244,6 +274,7 @@ func (f *HeapFile) insertTuple(t *Tuple, tid TransactionID) error {
 	}
 	t.Rid = rid
 	f.pageFull.Store(hp.pageNo, hp.numOpenSlots == 0)
+
 	return nil
 }
 
@@ -314,7 +345,8 @@ func (f *HeapFile) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
 		return nil, nil
 	}
 	return func() (*Tuple, error) {
-
+		//fmt.Println("Calling heapFile iterator on: ", f.fileName)
+		//fmt.Println("Number of pages: ", f.NumPages())
 		var t *Tuple
 		t, err := tupleIter()
 		if err != nil {
@@ -325,6 +357,7 @@ func (f *HeapFile) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
 			nextPage, err := f.bufPool.GetPage(f, pageNo, tid, ReadPerm)
 			pageNo += 1
 			if err != nil {
+				fmt.Println("Getting error when getting page.")
 				return nil, err
 			}
 			hp := (*nextPage).(*heapPage) // don't like doing this

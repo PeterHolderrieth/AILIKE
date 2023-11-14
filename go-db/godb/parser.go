@@ -185,6 +185,79 @@ type LogicalPlan struct {
 	alias         string
 }
 
+func (p *LogicalPlan) printLogicalPlan() {
+	fmt.Println("----------------")
+	fmt.Println("filters: ")
+	for _, el := range p.filters {
+		fmt.Println(el)
+	}
+	fmt.Println("----------------")
+
+	fmt.Println("----------------")
+	fmt.Println("joins: ")
+	for _, el := range p.joins {
+		fmt.Println(el)
+	}
+	fmt.Println("----------------")
+
+	fmt.Println("----------------")
+	fmt.Println("selects: ")
+	for _, el := range p.selects {
+		fmt.Println(el)
+	}
+	fmt.Println("----------------")
+
+	fmt.Println("----------------")
+	fmt.Println("aggs: ")
+	for _, el := range p.aggs {
+		fmt.Println(el)
+	}
+	fmt.Println("----------------")
+
+	fmt.Println("----------------")
+	fmt.Println("tables: ")
+	for _, el := range p.tables {
+		fmt.Println(el)
+	}
+	fmt.Println("----------------")
+
+	fmt.Println("----------------")
+	fmt.Println("subqueries: ")
+	for _, el := range p.subqueries {
+		fmt.Println(el)
+	}
+	fmt.Println("----------------")
+
+	fmt.Println("----------------")
+	fmt.Println("groupByFields: ")
+	for _, el := range p.groupByFields {
+		fmt.Println(el)
+	}
+	fmt.Println("----------------")
+
+	fmt.Println("----------------")
+	fmt.Println("orderByFields: ")
+	for _, el := range p.orderByFields {
+		fmt.Println(el)
+	}
+	fmt.Println("----------------")
+
+	fmt.Println("----------------")
+	fmt.Println("limit: ")
+	fmt.Println(p.limit)
+	fmt.Println("----------------")
+
+	fmt.Println("----------------")
+	fmt.Println("distinct: ")
+	fmt.Println(p.distinct)
+	fmt.Println("----------------")
+
+	fmt.Println("----------------")
+	fmt.Println("alias: ")
+	fmt.Println(p.alias)
+	fmt.Println("----------------")
+}
+
 func (p *LogicalPlan) getSubplanFields(c *Catalog) []*FieldType {
 	var nodes []*FieldType
 	for _, s := range p.selects {
@@ -195,14 +268,17 @@ func (p *LogicalPlan) getSubplanFields(c *Catalog) []*FieldType {
 }
 
 func parseWhere(c *Catalog, subqueries []*LogicalPlan, ts []*LogicalTableNode, expr sqlparser.Expr) ([]*LogicalFilterNode, []*LogicalJoinNode, error) {
+
 	switch expr := expr.(type) {
 	case *sqlparser.AndExpr:
-		//print("got and")
+
 		filterListLeft, joinListLeft, _ := parseWhere(c, subqueries, ts, expr.Left)
 		filterListRight, joinListRight, _ := parseWhere(c, subqueries, ts, expr.Right)
 		filterExprs := append(filterListLeft, filterListRight...)
 		joinExprs := append(joinListLeft, joinListRight...)
+
 		return filterExprs, joinExprs, nil
+
 	case *sqlparser.ComparisonExpr:
 		op := BoolOpMap[expr.Operator]
 		//print(op)
@@ -807,7 +883,6 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 	//build mapping from table names / aliases to operators
 
 	tableMap := make(map[string]*PlanNode)
-
 	for _, p := range plan.subqueries {
 		subPhysP, err := makePhysicalPlan(c, p)
 		if err != nil {
@@ -865,6 +940,8 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 				return nil, err
 			}
 			tableMap[leftExpr.GetExprType().TableQualifier] = &PlanNode{newOp, &desc}
+		default:
+			return nil, GoDBError{code: MalformedDataError, errString: "Don't allow for TextFields in expressions yet."}
 		}
 	}
 	//finally apply joins
@@ -918,6 +995,8 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 			newOp, err = NewIntJoin(op1, leftExpr, op2, rightExpr, JoinBufferSize)
 		case StringType:
 			newOp, err = NewStringJoin(op1, leftExpr, op2, rightExpr, JoinBufferSize)
+		default:
+			return nil, GoDBError{code: MalformedDataError, errString: "Don't allow for TextFields in expressions yet."}
 		}
 		if err != nil {
 			return nil, err
@@ -1006,6 +1085,8 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 					getter = intAggGetter
 				case StringType:
 					getter = stringAggGetter
+				default:
+					return nil, GoDBError{code: MalformedDataError, errString: "Don't allow for TextFields in expressions yet."}
 				}
 
 				switch *s.funcOp {
@@ -1262,6 +1343,8 @@ func processDDL(c *Catalog, ddl *sqlparser.DDL) (QueryType, error) {
 				fallthrough
 			case "varchar":
 				colType = StringType
+			case "embtext":
+				colType = EmbeddedStringType
 			default:
 				return UnknownQueryType, GoDBError{ParseError, fmt.Sprintf("unsupported column type %s", col.Type.Type)}
 
@@ -1293,15 +1376,14 @@ func Parse(c *Catalog, query string) (QueryType, Operator, error) {
 	case *sqlparser.Select:
 		plan, err := parseStatement(c, stmt)
 		if err != nil {
-			//fmt.Printf("Err: %s\n", err.Error())
 			return UnknownQueryType, nil, err
 		}
 		op, err := makePhysicalPlan(c, plan)
 		if err != nil {
-			//fmt.Printf("Err: %s\n", err.Error())
 			return UnknownQueryType, nil, err
 		}
 		return IteratorType, op, nil
+
 	case *sqlparser.Insert:
 		op, err := parseInsert(c, stmt)
 		if err != nil {

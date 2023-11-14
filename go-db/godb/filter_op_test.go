@@ -1,7 +1,6 @@
 package godb
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -28,7 +27,6 @@ func TestIntFilter(t *testing.T) {
 		if tup == nil {
 			break
 		}
-		fmt.Printf("filter passed tup %d: %v\n", cnt, tup)
 		cnt++
 	}
 	if cnt != 1 {
@@ -59,7 +57,6 @@ func TestStringFilter(t *testing.T) {
 		if tup == nil {
 			break
 		}
-		fmt.Printf("filter passed tup %d: %v\n", cnt, tup)
 		cnt++
 	}
 	if cnt != 1 {

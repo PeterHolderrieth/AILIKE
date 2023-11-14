@@ -12,7 +12,6 @@ func CheckIfOutputMatches(f func() (*Tuple, error), ts []*Tuple) bool {
 		if t1 == nil {
 			break
 		}
-		//		fmt.Printf("%v\n", t1)
 		got := false
 		for _, t2 := range ts {
 			if t1.equals(t2) {
@@ -50,6 +49,23 @@ func TestTupleSerialization(t *testing.T) {
 	}
 }
 
+func TestTextTupleSerialization(t *testing.T) {
+	td, t1, t2, _, _, _ := makeTextTestVars()
+	testTuples := [2]Tuple{t1, t2}
+
+	for _, tup := range testTuples {
+		b := new(bytes.Buffer)
+		tup.writeTo(b)
+		t3, err := readTupleFrom(b, &td)
+		if err != nil {
+			t.Fatalf("Error loading tuple from saved buffer: %s", err.Error())
+		}
+		if !t3.equals(&tup) {
+			t.Errorf("Serialization / deserialization doesn't result in identical tuple.")
+		}
+	}
+}
+
 // Unit test for Tuple.compareField()
 func TestTupleExpr(t *testing.T) {
 	td, t1, t2, _, _, _ := makeTestVars()
@@ -60,6 +76,29 @@ func TestTupleExpr(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	if result != OrderedGreaterThan {
+		t.Errorf("comparison of fields did not return expected result")
+	}
+}
+
+func TestTupleTextExpr(t *testing.T) {
+	td, t1, t2, _, _, _ := makeTextTestVars()
+	ft := td.Fields[0]
+	f := FieldExpr{ft}
+	result, err := t1.compareField(&t2, &f) // compare "sam" to "george jones"
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if result != OrderedGreaterThan {
+		t.Errorf("comparison of fields did not return expected result")
+	}
+
+	ft = td.Fields[2]
+	f = FieldExpr{ft}
+	result, err = t1.compareField(&t2, &f) // compare "sam" to "george jones"
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if result == OrderedGreaterThan {
 		t.Errorf("comparison of fields did not return expected result")
 	}
 }
