@@ -78,7 +78,6 @@ type FuncType struct {
 
 var funcs = map[string]FuncType{
 	//note should all be lower case
-	//"AILIKE":                {[]DBType{TextType, TextType}, IntType, CosDist},
 	"+":                     {[]DBType{IntType, IntType}, IntType, addFunc},
 	"-":                     {[]DBType{IntType, IntType}, IntType, minusFunc},
 	"*":                     {[]DBType{IntType, IntType}, IntType, timesFunc},
@@ -239,7 +238,7 @@ func (f *FuncExpr) EvalExpr(t *Tuple) (DBValue, error) {
 			argvals[i] = val.(IntField).Value
 		case StringType:
 			argvals[i] = val.(StringField).Value
-		case TextType:
+		case EmbeddedStringType:
 			argvals[i] = val.(EmbeddedStringField).Value
 		}
 	}
@@ -249,7 +248,7 @@ func (f *FuncExpr) EvalExpr(t *Tuple) (DBValue, error) {
 		return IntField{result.(int64)}, nil
 	case StringType:
 		return StringField{result.(string)}, nil
-	case TextType:
+	case EmbeddedStringType:
 		return StringField{result.(string)}, nil //We have never have expressions that result in text fields.
 	}
 	return nil, GoDBError{ParseError, "unknown result type in function"}
