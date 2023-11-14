@@ -48,7 +48,7 @@ func MakeTextTestDatabaseEasy(bp *BufferPool) error {
 	var td = TupleDesc{Fields: []FieldType{
 		{Fname: "name", Ftype: StringType},
 		{Fname: "age", Ftype: IntType},
-		{Fname: "biography", Ftype: TextType},
+		{Fname: "biography", Ftype: EmbeddedStringType},
 	}}
 	os.Remove("t2_text.dat")
 	os.Remove("t_text.dat")
@@ -240,12 +240,10 @@ func TestParseEasy(t *testing.T) {
 				t.Errorf("query '%s' did not match expected result set", sql)
 				verbose := true
 				if verbose {
-					fmt.Println()
 					fmt.Print("Expected: \n")
 					for _, r := range resultSet {
 						fmt.Printf("%s\n", r.PrettyPrintString(true))
 					}
-					fmt.Println()
 					fmt.Println("Got: ")
 					_, err := plan.Iterator(tid)
 					if err != nil {
@@ -437,7 +435,7 @@ func TestTextParseEasy(t *testing.T) {
 						fmt.Println("Tuple is nil after calling iterator.")
 					}
 					fmt.Println(err.Error())
-					fmt.Println()
+
 				}
 			}
 		}
