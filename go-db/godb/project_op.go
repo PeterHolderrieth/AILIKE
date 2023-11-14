@@ -73,6 +73,9 @@ func (p *Project) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
 				return pt, nil
 			}
 		}
+		if err != nil {
+			return nil, err
+		}
 		return nil, nil
 	}, nil
 }
