@@ -107,7 +107,7 @@ func parseCatalogFile(catalogFile string, rootPath string) ([]TupleDesc, []strin
 			case "text":
 				fieldArray = append(fieldArray, FieldType{nameType[0], "", StringType})
 			case "embtext":
-				fieldArray = append(fieldArray, FieldType{nameType[0], "", TextType})
+				fieldArray = append(fieldArray, FieldType{nameType[0], "", EmbeddedStringType})
 			default:
 				return nil, nil, GoDBError{ParseError, fmt.Sprintf("unknown type %s (line %s)", nameType[1], line)}
 			}

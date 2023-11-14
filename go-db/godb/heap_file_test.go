@@ -47,7 +47,7 @@ func makeTextTestVars() (TupleDesc, Tuple, Tuple, *HeapFile, *BufferPool, Transa
 	var td = TupleDesc{Fields: []FieldType{
 		{Fname: "name", Ftype: StringType},
 		{Fname: "age", Ftype: IntType},
-		{Fname: "biography", Ftype: TextType},
+		{Fname: "biography", Ftype: EmbeddedStringType},
 	}}
 
 	var t1 = Tuple{
