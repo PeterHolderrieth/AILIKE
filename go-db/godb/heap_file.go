@@ -351,6 +351,8 @@ func (f *HeapFile) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
 		return nil, nil
 	}
 	return func() (*Tuple, error) {
+		//fmt.Println("Calling heapFile iterator on: ", f.fileName)
+		//fmt.Println("Number of pages: ", f.NumPages())
 		var t *Tuple
 		t, err := tupleIter()
 		if err != nil {
@@ -361,6 +363,7 @@ func (f *HeapFile) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
 			nextPage, err := f.bufPool.GetPage(f, pageNo, tid, ReadPerm)
 			pageNo += 1
 			if err != nil {
+				fmt.Println("Getting error when getting page.")
 				return nil, err
 			}
 			hp := (*nextPage).(*heapPage) // don't like doing this
