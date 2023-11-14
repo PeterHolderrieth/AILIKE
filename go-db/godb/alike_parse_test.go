@@ -117,17 +117,17 @@ func TestParseAilike(t *testing.T) {
 				t.Errorf("csv file with results was nil (%s)", err.Error())
 				return
 			}
-			fmt.Println("reached here")
+			// fmt.Println("reached here")
 			err = outfile.LoadFromCSV(f, true, ",", false)
-			fmt.Println("reached here")
+			// fmt.Println("reached here")
 			if err != nil {
-				fmt.Println("lol")
+				// fmt.Println("lol")
 				t.Errorf(err.Error())
 				return
 			}
-			fmt.Println("reached here 11")
+			// fmt.Println("reached here 11")
 			resultIter, err := outfile.Iterator(tid)
-			fmt.Println("reached here")
+			// fmt.Println("reached here")
 			if err != nil {
 				t.Errorf("%s", err.Error())
 				return
