@@ -88,6 +88,44 @@ func CosDist(v1, v2 *EmbeddingType) (float64, error) {
 	return cosdist, nil
 }
 
+type DimResponse struct {
+	Dimension int `json:"dimemb"`
+}
+
+func getEmbeddingDim() int {
+	// Format text to string
+	data := map[string]interface{}{}
+
+	// Convert data to JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	// Send a POST request to the Python server
+	resp, err := http.Post("http://localhost:"+portNumber+"/dimemb", "application/json",
+		bytes.NewBuffer(jsonData))
+	if err != nil {
+		fmt.Println("Error sending HTTP request:", err)
+		panic(err.Error())
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Println("Received non-OK status code:", resp.Status)
+		panic(err.Error())
+	}
+
+	// Decode the response JSON
+	var dimResp DimResponse
+	decoder := json.NewDecoder(resp.Body)
+	if err := decoder.Decode(&dimResp); err != nil {
+		err.Error()
+	}
+
+	return dimResp.Dimension
+}
+
 func main() {
 	dataTexts := []string{"Twitter, Inc. was an American social media company based in San Francisco, California. The company operated the social networking service Twitter and previously the Vine short video app and Periscope livestreaming service. In April 2023, Twitter merged with X Holdings and ceased to be an independent company, becoming a part of X Corp.",
 		"Space Exploration Technologies Corp., commonly referred to as SpaceX, is an American spacecraft manufacturer, launch service provider, defense contractor and satellite communications company headquartered in Hawthorne, California. The company was founded in 2002 by Elon Musk with the goal of reducing space transportation costs and to colonize Mars. The company currently operates the Falcon 9 and Falcon Heavy rockets along with the Dragon spacecraft.",
@@ -101,6 +139,7 @@ func main() {
 	if err != nil {
 		return
 	}
+	fmt.Println("Embedding dimension: ", getEmbeddingDim())
 
 	for _, dataText := range dataTexts {
 		embedding, err := generateEmbeddings(dataText)

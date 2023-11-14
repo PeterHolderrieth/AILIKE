@@ -39,7 +39,7 @@ func (e GoDBError) Error() string {
 const (
 	PageSize           int = 8192
 	StringLength       int = 32
-	TextEmbeddingDim   int = 768
+	TextEmbeddingDim   int = 32
 	TextCharLength     int = 120
 	FloatSizeBytes     int = int(unsafe.Sizeof(float64(0.0)))
 	EmbeddingSizeBytes int = TextEmbeddingDim * FloatSizeBytes
