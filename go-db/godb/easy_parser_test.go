@@ -306,6 +306,17 @@ func TestTextParseEasy(t *testing.T) {
 			t.Errorf("failed to parse, q=%s, %s", sql, err.Error())
 			return
 		}
+		// //--DEBUG
+		// projectOp := plan.(*Project)
+		// hfile := projectOp.child.(*HeapFile)
+		// hiter, err := hfile.Iterator(tid)
+		// tuple, err := hiter()
+		// fmt.Println("heapfile tuple: ", tuple)
+		// fmt.Println("tuple.desc: ", tuple.Desc)
+		// fmt.Println("tuple.Fields[2]: ", tuple.Fields[2])
+		// fmt.Println("tuple.Fields[2].Value: ", tuple.Fields[2].(EmbeddedStringField).Value)
+
+		// //--DEBUG
 
 		if plan == nil {
 			t.Errorf("plan was nil")
