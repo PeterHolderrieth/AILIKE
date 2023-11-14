@@ -120,8 +120,6 @@ func TestParseEasy(t *testing.T) {
 		if qNo == 4 {
 			continue
 		}
-		fmt.Println("c.tables[0].name: ", c.tables[0].name)
-
 		qType, plan, err := Parse(c, sql)
 
 		if err != nil {
@@ -272,10 +270,15 @@ func TestTextParseEasy(t *testing.T) {
 		"select sum(age + 10), sum(age) from t_text",
 		"select min(age) + max(age) from t_text",
 		"select name,age from t_text limit 1+2",
+		"select t_text.name, t_text.age from t_text join t2_text on t_text.name = t2_text.name, t2_text as t3_text where t_text.age < 50 and t3_text.age = t_text.age order by t_text.age asc, t_text.name asc",
 		"select sq(sq(5)) from t_text",
 		"select 1, name from t_text",
 		"select age, name from t_text",
+		"select t_text.name, sum(age) totage from t_text group by t_text.name",
+		"select t_text.name, t_text.age from t_text join t2_text on t_text.name = t2_text.name where t_text.age < 50",
+		"select name from (select x.name from (select t_text.name from t_text) x)y order by name asc",
 		"select age, count(*) from t_text group by age",
+		"select name, age, biography from t_text",
 	}
 	save := false        //set save to true to save the output of the current test run as the correct answer
 	printOutput := false //print the result set during testing
@@ -295,7 +298,6 @@ func TestTextParseEasy(t *testing.T) {
 
 	qNo := 0
 	for _, sql := range queries {
-		fmt.Println("Doing query: ", sql)
 		tid := NewTID()
 		bp.BeginTransaction(tid)
 		qNo++
