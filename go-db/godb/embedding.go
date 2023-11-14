@@ -55,6 +55,44 @@ func generateEmbeddings(text string) (*EmbeddingResponse, error) {
 	return &embeddingResp, nil
 }
 
+type DimResponse struct {
+	Dimension int `json:"dimemb"`
+}
+
+func getEmbeddingDim() int {
+	// Format text to string
+	data := map[string]interface{}{}
+
+	// Convert data to JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	// Send a POST request to the Python server
+	resp, err := http.Post("http://localhost:"+portNumber+"/dimemb", "application/json",
+		bytes.NewBuffer(jsonData))
+	if err != nil {
+		fmt.Println("Error sending HTTP request:", err)
+		panic(err.Error())
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Println("Received non-OK status code:", resp.Status)
+		panic(err.Error())
+	}
+
+	// Decode the response JSON
+	var dimResp DimResponse
+	decoder := json.NewDecoder(resp.Body)
+	if err := decoder.Decode(&dimResp); err != nil {
+		err.Error()
+	}
+
+	return dimResp.Dimension
+}
+
 func dotProduct(v1, v2 *EmbeddingType) (float64, error) {
 	if len(*v1) != len(*v2) {
 		return 0.0, fmt.Errorf("Length mismatch: %d vs %d", len(*v1), len(*v2))
