@@ -75,18 +75,18 @@ func (f *HeapFile) NumPages() int {
 func (f *HeapFile) LoadFromCSV(file *os.File, hasHeader bool, sep string, skipLastField bool) error {
 	scanner := bufio.NewScanner(file)
 	cnt := 0
+	desc := f.Descriptor()
+	if desc == nil || desc.Fields == nil {
+		return GoDBError{MalformedDataError, "Descriptor was nil"}
+	}
 	for scanner.Scan() {
 		line := scanner.Text()
-		fields := strings.Split(line, sep)
+		fields := strings.SplitN(line, sep, len(desc.Fields))
 		if skipLastField {
 			fields = fields[0 : len(fields)-1]
 		}
 		numFields := len(fields)
 		cnt++
-		desc := f.Descriptor()
-		if desc == nil || desc.Fields == nil {
-			return GoDBError{MalformedDataError, "Descriptor was nil"}
-		}
 		if numFields != len(desc.Fields) {
 			return GoDBError{MalformedDataError, fmt.Sprintf("LoadFromCSV:  line %d (%s) does not have expected number of fields (expected %d, got %d)", cnt, line, len(f.Descriptor().Fields), numFields)}
 		}
