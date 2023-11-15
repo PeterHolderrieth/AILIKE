@@ -25,6 +25,7 @@ const (
 	IllegalOperationError   GoDBErrorCode = iota
 	DeadlockError           GoDBErrorCode = iota
 	IllegalTransactionError GoDBErrorCode = iota
+	FailedEmbedding         GoDBErrorCode = iota
 )
 
 type GoDBError struct {
@@ -46,6 +47,28 @@ const (
 	TextSizeBytes      int = EmbeddingSizeBytes + TextCharLength
 	IntSizeBytes       int = int(unsafe.Sizeof(int64(0)))
 )
+
+var (
+	// The following are configurable.
+	UseRandomProj bool = false
+	PageSize      int  = 8192
+
+	// the following will chaneg based on configurable variables
+	TextEmbeddingDim   int = 768
+	EmbeddingSizeBytes int = TextEmbeddingDim * FloatSizeBytes
+	TextSizeBytes      int = EmbeddingSizeBytes + TextCharLength
+)
+
+// Currently unused; TODO: call this function when updating the config
+func updateConfigurationVariables() {
+	if UseRandomProj {
+		TextEmbeddingDim = 32
+	} else {
+		TextEmbeddingDim = 768
+	}
+	EmbeddingSizeBytes = TextEmbeddingDim * FloatSizeBytes
+	TextSizeBytes = EmbeddingSizeBytes + TextCharLength
+}
 
 type Page interface {
 	//these methods are used by buffer pool to

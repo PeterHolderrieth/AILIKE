@@ -45,7 +45,7 @@ def generate_embedding(sentence: str, random_proj: bool = False):
     return embeddings.tolist()
 
 #Projection matrix if wanted:
-RANDOM_PROJ = True
+RANDOM_PROJ = False
 PROJ_DIM = 32
 MODEL_DIM = len(generate_embedding(sentence="testtext", random_proj=False))
 if RANDOM_PROJ:
