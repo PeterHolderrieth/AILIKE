@@ -1,3 +1,4 @@
+"""Script to generate random projection matrices."""
 import argparse
 import torch
 import os
