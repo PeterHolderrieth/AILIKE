@@ -78,7 +78,6 @@ type FuncType struct {
 
 var funcs = map[string]FuncType{
 	//note should all be lower case
-	"ailike":                {[]DBType{EmbeddedStringType, EmbeddedStringType}, IntType, ailikeFunc},
 	"+":                     {[]DBType{IntType, IntType}, IntType, addFunc},
 	"-":                     {[]DBType{IntType, IntType}, IntType, minusFunc},
 	"*":                     {[]DBType{IntType, IntType}, IntType, timesFunc},
@@ -93,6 +92,8 @@ var funcs = map[string]FuncType{
 	"epochtodatetimestring": {[]DBType{IntType}, StringType, dateString},
 	"imin":                  {[]DBType{IntType, IntType}, IntType, minFunc},
 	"imax":                  {[]DBType{IntType, IntType}, IntType, maxFunc},
+	"ailike":                {[]DBType{EmbeddedStringType, EmbeddedStringType}, IntType, ailikeFunc},
+	"ailike_cos":            {[]DBType{EmbeddedStringType, EmbeddedStringType}, IntType, ailikeCosFunc},
 }
 
 func ListOfFunctions() string {
@@ -260,6 +261,19 @@ func ailikeFunc(args []any) any {
 	v2 := args[1].(EmbeddedStringField).Emb
 
 	r, err := dotProduct(&v1, &v2);
+
+	if err != nil{
+		panic("Failed to compute dot product in AILIKE")
+	}
+
+	return int64(r)
+}
+
+func ailikeCosFunc(args []any) any {
+	v1 := args[0].(EmbeddedStringField).Emb
+	v2 := args[1].(EmbeddedStringField).Emb
+
+	r, err := CosDist(&v1, &v2);
 
 	if err != nil{
 		panic("Failed to compute dot product in AILIKE")

@@ -476,6 +476,23 @@ func parseExpr(c *Catalog, expr sqlparser.Expr, alias string) (*LogicalSelectNod
 		exprList[1] = right
 		outer := NewFuncSelectNode("ailike", exprList, alias)
 		return &outer, nil
+	case *sqlparser.AilikeCosExpr:
+		
+		left, err := parseExpr(c, expr.Left, "")
+		if err != nil {
+			return nil, err
+		}
+
+		right, err := parseExpr(c, expr.Right, "")
+		if err != nil {
+			return nil, err
+		}
+
+		exprList := make([]*LogicalSelectNode, 2)
+		exprList[0] = left
+		exprList[1] = right
+		outer := NewFuncSelectNode("ailike_cos", exprList, alias)
+		return &outer, nil
 	case *sqlparser.ParenExpr:
 		return parseExpr(c, expr.Expr, alias)
 	case *sqlparser.ColName:
@@ -743,7 +760,7 @@ func (s *LogicalSelectNode) generateExpr(c *Catalog, inputDesc *TupleDesc, table
 		fieldName := *s.funcOp
 		isAilikeNode := false
 
-		if fieldName == "ailike" {
+		if fieldName == "ailike" || fieldName == "ailike_cos" {
 			isAilikeNode = true
 		}
 		if s.alias != "" {
