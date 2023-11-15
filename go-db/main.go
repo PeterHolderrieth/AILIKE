@@ -15,6 +15,8 @@ import (
 	"github.com/srmadden/godb"
 )
 
+var UseRandomProj bool = false
+
 func check(e error) {
 	if e != nil {
 		panic(e)
@@ -82,8 +84,12 @@ func main() {
 	//catName := "tpch-catalog.sql"
 	//catPath := "godb/tpch-dbgen"
 
-	catName := "catalog.txt"
-	catPath := "godb"
+	catName := "tweets_768.catalog"
+	catPath := "../data/tweets/tweets_768/"
+	if UseRandomProj {
+		catName = "tweets_768.catalog"
+		catPath = "../data/tweets/tweets_768/"
+	}
 
 	c, err := godb.NewCatalogFromFile(catName, bp, catPath)
 	if err != nil {
