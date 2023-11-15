@@ -1,10 +1,10 @@
 module main
 
-go 1.21.1
+go 1.19
 
 replace github.com/srmadden/godb => ./godb
 
-replace github.com/xwb1989/sqlparser => github.com/manya-bansal/sqlparser v0.2.0
+replace github.com/xwb1989/sqlparser => github.com/manya-bansal/sqlparser v0.2.1
 
 require (
 	github.com/chzyer/readline v1.5.1
