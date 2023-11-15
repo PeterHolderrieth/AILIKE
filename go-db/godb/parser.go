@@ -809,6 +809,12 @@ func exprToStr(e Expr) string {
 		}
 		return fmt.Sprintf("%s%s", tbl, ex.selectField.Fname)
 	case *ConstExpr:
+		if ex.constType == EmbeddedStringType {
+			// For EmbeddedStringFields, printing the entire vector makes the query plan hard to read
+			// so we just print the first element.
+			embString := ex.val.(EmbeddedStringField)
+			return fmt.Sprintf("%v[%v,...]", embString.Value, embString.Emb[0])
+		}
 		return fmt.Sprintf("%v", ex.val)
 	case *FuncExpr:
 		argStr := ""
