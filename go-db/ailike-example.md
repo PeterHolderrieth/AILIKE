@@ -24,5 +24,5 @@ In the `go-db` folder run:
 ## Step 3
 Perform queries! Examples: 
 
-- With a string literal: `select name, age, (biography alike 'test string') sim from t_text' order by sim limit 5;`
-- With a coloumn: `select name, age, (biography alike biography) sim from t_text' order by sim limit 5;`
+- With a string literal: `select name, age, (biography ailike 'test string') sim from t_text order by sim limit 5;`
+- With a coloumn: `select name, age, (biography ailike biography) sim from t_text order by sim limit 5;`
