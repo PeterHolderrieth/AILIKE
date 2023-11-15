@@ -1,3 +1,5 @@
+"""Script to explore various models. Not used in production but only for code development."""
+
 from transformers import AutoTokenizer, AutoModel
 import torch
 import pandas as pd
