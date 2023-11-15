@@ -78,6 +78,7 @@ type FuncType struct {
 
 var funcs = map[string]FuncType{
 	//note should all be lower case
+	"ailike":                {[]DBType{EmbeddedStringType, EmbeddedStringType}, IntType, ailikeFunc},
 	"+":                     {[]DBType{IntType, IntType}, IntType, addFunc},
 	"-":                     {[]DBType{IntType, IntType}, IntType, minusFunc},
 	"*":                     {[]DBType{IntType, IntType}, IntType, timesFunc},
@@ -239,7 +240,7 @@ func (f *FuncExpr) EvalExpr(t *Tuple) (DBValue, error) {
 		case StringType:
 			argvals[i] = val.(StringField).Value
 		case EmbeddedStringType:
-			argvals[i] = val.(EmbeddedStringField).Value
+			argvals[i] = val.(EmbeddedStringField)
 		}
 	}
 	result := fType.f(argvals)
@@ -249,7 +250,20 @@ func (f *FuncExpr) EvalExpr(t *Tuple) (DBValue, error) {
 	case StringType:
 		return StringField{result.(string)}, nil
 	case EmbeddedStringType:
-		return StringField{result.(string)}, nil //We have never have expressions that result in text fields.
+		return IntField{result.(int64)}, nil //We have never have expressions that result in text fields.
 	}
 	return nil, GoDBError{ParseError, "unknown result type in function"}
+}
+
+func ailikeFunc(args []any) any {
+	v1 := args[0].(EmbeddedStringField).Emb
+	v2 := args[1].(EmbeddedStringField).Emb
+
+	r, err := dotProduct(&v1, &v2);
+
+	if err != nil{
+		panic("Failed to compute dot product in AILIKE")
+	}
+
+	return int64(r)
 }

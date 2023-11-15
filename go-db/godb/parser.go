@@ -459,6 +459,23 @@ func parseExpr(c *Catalog, expr sqlparser.Expr, alias string) (*LogicalSelectNod
 		exprList[1] = right
 		outer := NewFuncSelectNode(opname, exprList, alias)
 		return &outer, nil
+	case *sqlparser.AilikeExpr:
+		
+		left, err := parseExpr(c, expr.Left, "")
+		if err != nil {
+			return nil, err
+		}
+
+		right, err := parseExpr(c, expr.Right, "")
+		if err != nil {
+			return nil, err
+		}
+
+		exprList := make([]*LogicalSelectNode, 2)
+		exprList[0] = left
+		exprList[1] = right
+		outer := NewFuncSelectNode("ailike", exprList, alias)
+		return &outer, nil
 	case *sqlparser.ParenExpr:
 		return parseExpr(c, expr.Expr, alias)
 	case *sqlparser.ColName:
@@ -722,13 +739,35 @@ func (s *LogicalSelectNode) generateExpr(c *Catalog, inputDesc *TupleDesc, table
 		ce := ConstExpr{fval, constType}
 		return &ce, fieldName, nil
 	case ExprFunc:
+		
 		fieldName := *s.funcOp
+		isAilikeNode := false
+
+		if fieldName == "ailike" {
+			isAilikeNode = true
+		}
 		if s.alias != "" {
 			fieldName = s.alias
 		}
 		exprs := make([]*Expr, len(s.args))
 		for i, lsn := range s.args {
 			newExpr, _, err := lsn.generateExpr(c, inputDesc, tableMap)
+			if isAilikeNode{
+				if lsn.exprType == ExprConst{
+					_, e := strconv.Atoi(lsn.value)
+					if e == nil {
+						return nil, "", GoDBError{TypeMismatchError, "Cannot perform an AILIKE op with integer literals."}
+					} else {
+						embResp, err := generateEmbeddings(lsn.value)
+						if err != nil {
+							return nil, "", GoDBError{FailedEmbedding, "Failed to produce a vector embedding."}
+						}
+						embeddedLiteral := EmbeddedStringField{Value : lsn.value, Emb: make([]float64, TextEmbeddingDim)}
+						embeddedLiteral.Emb = embResp.Embedding
+						newExpr = &ConstExpr{embeddedLiteral, EmbeddedStringType}
+					}
+				}
+			}
 			if err != nil {
 				return nil, "", err
 			}
@@ -1370,6 +1409,7 @@ func processDDL(c *Catalog, ddl *sqlparser.DDL) (QueryType, error) {
 func Parse(c *Catalog, query string) (QueryType, Operator, error) {
 	stmt, err := sqlparser.Parse(query)
 	if err != nil {
+		fmt.Println("unknown query type check")
 		return UnknownQueryType, nil, err
 	}
 	switch stmt := stmt.(type) {
@@ -1387,12 +1427,14 @@ func Parse(c *Catalog, query string) (QueryType, Operator, error) {
 	case *sqlparser.Insert:
 		op, err := parseInsert(c, stmt)
 		if err != nil {
+			fmt.Println("unknown query type 2")
 			return UnknownQueryType, nil, err
 		}
 		return IteratorType, op, nil
 	case *sqlparser.Delete:
 		op, err := parseDelete(c, stmt)
 		if err != nil {
+			fmt.Println("unknown query type 3")
 			return UnknownQueryType, nil, err
 		}
 		return IteratorType, op, nil
@@ -1405,6 +1447,7 @@ func Parse(c *Catalog, query string) (QueryType, Operator, error) {
 	case *sqlparser.DDL:
 		qtype, err := processDDL(c, stmt)
 		if err != nil {
+			fmt.Println("unknown query type 4")
 			return UnknownQueryType, nil, err
 		} else {
 			return qtype, nil, nil
