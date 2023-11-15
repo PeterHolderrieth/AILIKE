@@ -46,11 +46,11 @@ const (
 
 var (
 	// The following are configurable.
-	UseRandomProj bool = true
+	UseRandomProj bool = false
 	PageSize      int  = 8192
 
 	// the following will chaneg based on configurable variables
-	TextEmbeddingDim   int = 32 // Or 768 if UseRandomProj = false
+	TextEmbeddingDim   int = 768
 	EmbeddingSizeBytes int = TextEmbeddingDim * FloatSizeBytes
 	TextSizeBytes      int = EmbeddingSizeBytes + TextCharLength
 )
