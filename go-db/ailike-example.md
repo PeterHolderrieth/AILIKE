@@ -9,9 +9,14 @@ go get main
 go mod tidy
 ```
 
-## Step 1: Generate embeddings 
+You might also need the following additional commands within `godb`:
+```
+TODO
+```
 
-In the embedding folder, run:
+## Step 1: Run the python server for generating embeddings
+
+In the `/embedding` folder, start the python server by running:
   `python embedding.py`
 
 ## Step 2: Starting GoDB
@@ -19,10 +24,24 @@ In the embedding folder, run:
 In the `go-db` folder run:
 
 - `go run main.go`
-- Load the catalog `\c godb/catalog_text.txt`
 
-## Step 3
+## Step 3: Load the data
+
+If using random projections, load the data by running:
+```
+`\c ../data/tweets/tweets_32/tweets_32.catalog`
+```
+
+If using the full embeddings, load the data by running:
+```
+`\c ../data/tweets/tweets_768/tweets_768.catalog`
+```
+
+
+NOTE: When loading data, you need to make sure the db configurable variables (UseRandomProj and PageSize) match the parameters that were used to generate the .dat files. Furthermore, you need to make sure that the value of RANDOM_PROJ within embedding.py matches that of UseRandomProj. You may need to restart the python server if they do not match.
+
+## Step 4
 Perform queries! Examples: 
 
-- With a string literal: `select name, age, (biography ailike 'test string') sim from t_text order by sim limit 5;`
-- With a coloumn: `select name, age, (biography ailike biography) sim from t_text order by sim limit 5;`
+- With a string literal: `select tweet_id, sentiment, (content ailike 'test string') sim from tweets_mini order by sim limit 5;`
+- With a coloumn: `select tweet_id, sentiment, (content ailike content) sim from tweets_mini order by sim limit 5;`
