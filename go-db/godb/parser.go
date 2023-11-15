@@ -741,10 +741,10 @@ func (s *LogicalSelectNode) generateExpr(c *Catalog, inputDesc *TupleDesc, table
 	case ExprFunc:
 		
 		fieldName := *s.funcOp
-		ailikeNode := false
+		isAilikeNode := false
 
 		if fieldName == "ailike" {
-			ailikeNode = true
+			isAilikeNode = true
 		}
 		if s.alias != "" {
 			fieldName = s.alias
@@ -752,7 +752,7 @@ func (s *LogicalSelectNode) generateExpr(c *Catalog, inputDesc *TupleDesc, table
 		exprs := make([]*Expr, len(s.args))
 		for i, lsn := range s.args {
 			newExpr, _, err := lsn.generateExpr(c, inputDesc, tableMap)
-			if ailikeNode{
+			if isAilikeNode{
 				if lsn.exprType == ExprConst{
 					_, e := strconv.Atoi(lsn.value)
 					if e == nil {
