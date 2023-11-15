@@ -240,8 +240,6 @@ func (f *FuncExpr) EvalExpr(t *Tuple) (DBValue, error) {
 			argvals[i] = val.(IntField).Value
 		case StringType:
 			argvals[i] = val.(StringField).Value
-		case EmbeddedStringType:
-			argvals[i] = val.(EmbeddedStringField)
 		}
 	}
 	result := fType.f(argvals)
@@ -250,8 +248,6 @@ func (f *FuncExpr) EvalExpr(t *Tuple) (DBValue, error) {
 		return IntField{result.(int64)}, nil
 	case StringType:
 		return StringField{result.(string)}, nil
-	case EmbeddedStringType:
-		return IntField{result.(int64)}, nil //We have never have expressions that result in text fields.
 	}
 	return nil, GoDBError{ParseError, "unknown result type in function"}
 }
@@ -260,9 +256,22 @@ func ailikeFunc(args []any) any {
 	v1 := args[0].(EmbeddedStringField).Emb
 	v2 := args[1].(EmbeddedStringField).Emb
 
-	r, err := dotProduct(&v1, &v2);
+	r, err := dotProduct(&v1, &v2)
 
-	if err != nil{
+	if err != nil {
+		panic("Failed to compute dot product in AILIKE")
+	}
+
+	return int64(r)
+}
+
+func ailikeCosFunc(args []any) any {
+	v1 := args[0].(EmbeddedStringField).Emb
+	v2 := args[1].(EmbeddedStringField).Emb
+
+	r, err := CosDist(&v1, &v2)
+
+	if err != nil {
 		panic("Failed to compute dot product in AILIKE")
 	}
 
