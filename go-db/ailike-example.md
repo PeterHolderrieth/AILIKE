@@ -46,6 +46,15 @@ Perform queries! Examples:
 - With a string literal: `select tweet_id, sentiment, (content ailike 'test string') sim from tweets_mini order by sim limit 5;`
 - With a coloumn: `select tweet_id, sentiment, (content ailike content) sim from tweets_mini order by sim limit 5;`
 
-Other examples:
-- select count(*) from tweets_mini;
-- explain select tweet_id, sentiment, (content ailike 'I am feeling really tired') sim from tweets_mini order by sim limit 5;
+Examples that should use index:
+select tweet_id, sentiment, content, (content ailike 'I am feeling really tired') sim from tweets_mini order by sim desc limit 5;
+select tweet_id, sentiment, content, (content ailike 'I am feeling really tired') sim from tweets_mini order by sim desc, sentiment limit 5;
+select max(content ailike 'I am feeling really tired') from tweets_mini;
+
+
+Examples that should not use index:
+select count(*) from tweets_mini;
+select tweet_id, sentiment, content, (content ailike 'I am feeling really tired') sim from tweets_mini order by sentiment, sim desc limit 5;
+select tweet_id, sentiment, content, (content ailike 'I am feeling really tired') sim from tweets_mini where sentiment = 'enthusiasm' order by sim desc limit 5;
+select * from tweets_mini limit 10;
+select * from tweets_mini where sentiment = 'enthusiasm' limit 10;
