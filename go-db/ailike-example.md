@@ -51,6 +51,8 @@ select tweet_id, sentiment, content, (content ailike 'I am feeling really tired'
 select tweet_id, sentiment, content, (content ailike 'I am feeling really tired') sim from tweets_mini order by sim desc, sentiment limit 5;
 select max(content ailike 'I am feeling really tired') from tweets_mini;
 
+Examples that could use index, but don't:
+explain select t1.tweet_id, t1.sentiment, max(t1.content ailike t2.content) from tweets_mini as t1 join tweets_mini as t2 on t1.sentiment = t2.sentiment group by t1.tweet_id, t1.sentiment;
 
 Examples that should not use index:
 select count(*) from tweets_mini;
@@ -58,3 +60,4 @@ select tweet_id, sentiment, content, (content ailike 'I am feeling really tired'
 select tweet_id, sentiment, content, (content ailike 'I am feeling really tired') sim from tweets_mini where sentiment = 'enthusiasm' order by sim desc limit 5;
 select * from tweets_mini limit 10;
 select * from tweets_mini where sentiment = 'enthusiasm' limit 10;
+select max(content ailike 'I am feeling really tired'), min(content ailike 'I am feeling really energized') from tweets_mini;
