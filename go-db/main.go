@@ -82,11 +82,11 @@ func main() {
 	//catName := "tpch-catalog.sql"
 	//catPath := "godb/tpch-dbgen"
 
-	catName := "tweets_768.catalog"
-	catPath := "../data/tweets/tweets_768/"
+	catName := "tweets_384.catalog"
+	catPath := "../data/tweets/tweets_384/"
 	if godb.UseRandomProj {
-		catName = "tweets_768.catalog"
-		catPath = "../data/tweets/tweets_768/"
+		catName = "tweets_32.catalog"
+		catPath = "../data/tweets/tweets_32/"
 	}
 
 	c, err := godb.NewCatalogFromFile(catName, bp, catPath)
