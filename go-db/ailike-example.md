@@ -29,12 +29,12 @@ In the `go-db` folder run:
 
 If using random projections, load the data by running:
 ```
-`\c ../data/tweets/tweets_32/tweets_32.catalog`
+\c ../data/tweets/tweets_32/tweets_32.catalog
 ```
 
 If using the full embeddings, load the data by running:
 ```
-`\c ../data/tweets/tweets_768/tweets_768.catalog`
+\c ../data/tweets/tweets_768/tweets_768.catalog
 ```
 
 
