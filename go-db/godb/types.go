@@ -49,8 +49,8 @@ var (
 	UseRandomProj bool = false
 	PageSize      int  = 8192
 
-	// the following will chaneg based on configurable variables
-	TextEmbeddingDim   int = 768
+	// the following will change based on configurable variables
+	TextEmbeddingDim   int = 384
 	EmbeddingSizeBytes int = TextEmbeddingDim * FloatSizeBytes
 	TextSizeBytes      int = EmbeddingSizeBytes + TextCharLength
 )
