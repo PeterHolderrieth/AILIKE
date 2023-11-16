@@ -441,4 +441,3 @@ func TestTextParseEasy(t *testing.T) {
 		}
 	}
 }
-
