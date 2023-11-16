@@ -38,14 +38,10 @@ func (e GoDBError) Error() string {
 }
 
 const (
-	PageSize           int = 8192
-	StringLength       int = 32
-	TextEmbeddingDim   int = 32
-	TextCharLength     int = 120
-	FloatSizeBytes     int = int(unsafe.Sizeof(float64(0.0)))
-	EmbeddingSizeBytes int = TextEmbeddingDim * FloatSizeBytes
-	TextSizeBytes      int = EmbeddingSizeBytes + TextCharLength
-	IntSizeBytes       int = int(unsafe.Sizeof(int64(0)))
+	StringLength   int = 32
+	TextCharLength int = 120
+	FloatSizeBytes int = int(unsafe.Sizeof(float64(0.0)))
+	IntSizeBytes   int = int(unsafe.Sizeof(int64(0)))
 )
 
 var (
@@ -53,8 +49,8 @@ var (
 	UseRandomProj bool = false
 	PageSize      int  = 8192
 
-	// the following will chaneg based on configurable variables
-	TextEmbeddingDim   int = 768
+	// the following will change based on configurable variables
+	TextEmbeddingDim   int = 384
 	EmbeddingSizeBytes int = TextEmbeddingDim * FloatSizeBytes
 	TextSizeBytes      int = EmbeddingSizeBytes + TextCharLength
 )
