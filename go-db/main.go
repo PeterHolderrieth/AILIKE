@@ -15,8 +15,6 @@ import (
 	"github.com/srmadden/godb"
 )
 
-var UseRandomProj bool = false
-
 func check(e error) {
 	if e != nil {
 		panic(e)
@@ -86,7 +84,7 @@ func main() {
 
 	catName := "tweets_768.catalog"
 	catPath := "../data/tweets/tweets_768/"
-	if UseRandomProj {
+	if godb.UseRandomProj {
 		catName = "tweets_768.catalog"
 		catPath = "../data/tweets/tweets_768/"
 	}
