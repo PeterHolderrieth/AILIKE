@@ -2,7 +2,7 @@ module github.com/srmadden/godb
 
 go 1.21.1
 
-replace github.com/xwb1989/sqlparser => github.com/manya-bansal/sqlparser v0.2.0
+replace github.com/xwb1989/sqlparser => github.com/manya-bansal/sqlparser v0.2.2
 
 require (
 	github.com/mitchellh/hashstructure/v2 v2.0.2
