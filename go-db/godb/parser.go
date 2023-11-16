@@ -943,6 +943,39 @@ func PrintPhysicalPlan(o Operator, indent string) {
 	}
 }
 
+func _getArgsFromAilikeFunc(expr Expr, c *Catalog) (indexField *FieldExpr, queryVector *ConstExpr, err error) {
+	if e, ok := expr.(*FuncExpr); ok && e.op == "ailike" {
+		// One arg must be a FieldExpr, the other must be a ConstExpr
+		var constExpr *ConstExpr = nil
+		var fieldExpr *FieldExpr = nil
+		left, right := e.args[0], e.args[1]
+		if leftConstExpr, ok := (*left).(*ConstExpr); ok {
+			if rightFieldExpr, ok := (*right).(*FieldExpr); ok {
+				constExpr = leftConstExpr
+				fieldExpr = rightFieldExpr
+			}
+		}
+		if leftFieldExpr, ok := (*left).(*FieldExpr); ok {
+			if rightConstExpr, ok := (*right).(*ConstExpr); ok {
+				constExpr = rightConstExpr
+				fieldExpr = leftFieldExpr
+			}
+		}
+		if constExpr == nil && fieldExpr == nil {
+			return indexField, queryVector, nil
+		}
+		if constExpr.constType != EmbeddedStringType || fieldExpr.selectField.Ftype != EmbeddedStringType {
+			return nil, nil, GoDBError{ParseError, "Attempting to plan AILIKE operation with non-EmbededStringType."}
+		}
+		// TODO: we will need to check if the field has an index
+		if vectorIndexExists(fieldExpr.selectField, c) {
+			indexField = fieldExpr
+			queryVector = constExpr
+		}
+	}
+	return indexField, queryVector, nil
+}
+
 func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 	//build mapping from table names / aliases to operators
 
@@ -1109,7 +1142,11 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 			}
 		}
 	*/
-
+	var indexField *FieldExpr = nil
+	var queryVector *ConstExpr = nil
+	var ascending bool = false
+	var err error = nil
+	hasOnlyOneAgg := len(plan.aggs) == 1
 	if hasAgg {
 		var gbys []Expr
 		var aggs []AggState
@@ -1185,6 +1222,13 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 				as.Init(name, aggExpr, getter)
 				aggs = append(aggs, as)
 				s.cachedField = &as.GetTupleDesc().Fields[0] //track aggregates by reference rather than name
+
+				if hasOnlyOneAgg {
+					indexField, queryVector, err = _getArgsFromAilikeFunc(aggExpr, c)
+					if err != nil {
+						return nil, err
+					}
+				}
 			}
 		}
 
@@ -1194,6 +1238,20 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 				return nil, err
 			}
 			gbys = append(gbys, expr)
+		}
+
+		heapFile, topOpIsHeapFile := (topOp).(*HeapFile)
+		if len(plan.groupByFields) == 0 && indexField != nil && queryVector != nil && topOpIsHeapFile {
+			var one IntField = IntField{1}
+			var limitExpr *ConstExpr = &ConstExpr{one, IntType}
+			if err != nil {
+				return nil, GoDBError{ParseError, "Could not determine limit for vector index."}
+			}
+			vectorIndex, err := NewVectorIndex(*heapFile, limitExpr, (*indexField).selectField, *queryVector, ascending)
+			if err != nil {
+				return nil, GoDBError{ParseError, "Could not create VectorIndex"}
+			}
+			topOp = vectorIndex
 		}
 
 		if len(gbys) == 0 {
@@ -1227,9 +1285,6 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 				- there exists a vector index on the column involved in the ailike epxression
 		*/
 		var firstOrderByField *string = nil
-		var indexField *FieldExpr = nil
-		var queryVector *ConstExpr = nil
-		var ascending bool = false
 		if len(plan.orderByFields) > 0 {
 			orderByNode := *plan.orderByFields[0]
 			firstOrderByField = &(orderByNode.expr).field
@@ -1238,31 +1293,9 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 		for i, fieldName := range fieldNames {
 			if firstOrderByField != nil && fieldName == *firstOrderByField {
 				expr := exprList[i]
-				if e, ok := expr.(*FuncExpr); ok && e.op == "ailike" {
-					// One arg must be a FieldExpr, the other must be a ConstExpr
-					var constExpr *ConstExpr = nil
-					var fieldExpr *FieldExpr = nil
-					left, right := e.args[0], e.args[1]
-					if leftConstExpr, ok := (*left).(*ConstExpr); ok {
-						if rightFieldExpr, ok := (*right).(*FieldExpr); ok {
-							constExpr = leftConstExpr
-							fieldExpr = rightFieldExpr
-						}
-					}
-					if leftFieldExpr, ok := (*left).(*FieldExpr); ok {
-						if rightConstExpr, ok := (*right).(*ConstExpr); ok {
-							constExpr = rightConstExpr
-							fieldExpr = leftFieldExpr
-						}
-					}
-					if constExpr.constType != EmbeddedStringType || fieldExpr.selectField.Ftype != EmbeddedStringType {
-						return nil, GoDBError{ParseError, "Attempting to plan AILIKE operation with non-EmbededStringType."}
-					}
-					// TODO: we will need to check if the field has an index
-					if vectorIndexExists(fieldExpr.selectField, c) {
-						indexField = fieldExpr
-						queryVector = constExpr
-					}
+				indexField, queryVector, err = _getArgsFromAilikeFunc(expr, c)
+				if err != nil {
+					return nil, err
 				}
 			}
 		}
