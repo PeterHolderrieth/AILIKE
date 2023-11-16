@@ -906,6 +906,8 @@ func PrintPhysicalPlan(o Operator, indent string) {
 		PrintPhysicalPlan(op.child, indent)
 	case *HeapFile:
 		fmt.Printf("%sHeap Scan %v\n", indent, getStrFromObj(op))
+	case *VectorIndex:
+		fmt.Printf("%sVectorIndex Scan %v\n", indent, op.PrettyPrint())
 	case *OrderBy:
 		orderStr := ""
 		for _, ex := range op.orderBy {
@@ -955,9 +957,6 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 		//td = td.setTableAlias(p.alias)
 		tableMap[p.alias] = &PlanNode{subPhysP, td}
 	}
-	fmt.Println(tableMap)
-	fmt.Println(plan)
-
 	for _, t := range plan.tables {
 		name := t.tableName
 		if t.alias != "" {
@@ -968,8 +967,6 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 		//td = td.setTableAlias(name)
 		tableMap[name] = &PlanNode{*t.file, td}
 	}
-	fmt.Println(tableMap)
-	fmt.Println(plan)
 
 	//now apply each filter to appropriate table
 	for _, f := range plan.filters {
@@ -1222,16 +1219,13 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 		}
 	}
 	if !selectAll {
-		projOp, err := NewProjectOp(exprList, fieldNames, plan.distinct, topOp)
-
 		// For now, only use vector index if we order-by similarity and limit results
 		// similarityExprs := make([]Expr, 0)
-		similarityFields := make(map[FieldType]ConstExpr, 0)
-		for _, expr := range exprList {
+		similarityFields := make(map[string][2]Expr, 0) // maps field names to the associated fieldExpr, constExprt
+		for i, expr := range exprList {
 			if e, ok := expr.(*FuncExpr); ok && e.op == "ailike" {
 				// we only use the index if we are comparing a constant embeded string
 				// against an embedded string column, and an index exists for that column
-				fmt.Println(e)
 				var constExpr *ConstExpr = nil
 				var fieldExpr *FieldExpr = nil
 				left, right := e.args[0], e.args[1]
@@ -1252,32 +1246,35 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 				}
 				// TODO: we will need to check if the field has an index
 				if vectorIndexExists(fieldExpr.selectField, c) {
-					similarityFields[fieldExpr.selectField] = *constExpr
+					similarityFields[fieldNames[i]] = [2]Expr{fieldExpr, constExpr}
 				}
 			}
 		}
-		fmt.Println(similarityFields)
 
-		var orderBySimilarityField *string = nil
+		var indexField *FieldExpr = nil
+		var queryVector *ConstExpr = nil
+		var ascending bool = false
 		for _, orderByNode := range plan.orderByFields {
 			field := (*orderByNode.expr).field
-			for simField := range similarityFields {
-				if simField.Fname == field {
-					orderBySimilarityField = &field
-					continue
-				}
+			if exprs, ok := similarityFields[field]; ok {
+				indexField = (exprs[0]).(*FieldExpr)
+				queryVector = (exprs[1]).(*ConstExpr)
+				ascending = orderByNode.ascending
 			}
 		}
-		fmt.Println("here")
-		if orderBySimilarityField != nil {
-			fmt.Println("sim field: ", orderBySimilarityField)
+		heapFile, topOpIsHeapFile := (topOp).(*HeapFile)
+		if plan.limit != nil && indexField != nil && queryVector != nil && topOpIsHeapFile {
+			limitExpr, _, err := plan.limit.generateExpr(c, topOp.Descriptor(), tableMap)
+			if err != nil {
+				return nil, GoDBError{ParseError, "Could not determine limit for vector index."}
+			}
+			vectorIndex, err := NewVectorIndex(*heapFile, limitExpr, (*indexField).selectField, *queryVector, ascending)
+			if err != nil {
+				return nil, GoDBError{ParseError, "Could not create VectorIndex"}
+			}
+			topOp = vectorIndex
 		}
-		// if orderBySimilarity {
-		// 	if plan.limit != nil {
-
-		// 	}
-		// }
-
+		projOp, err := NewProjectOp(exprList, fieldNames, plan.distinct, topOp)
 		if err != nil {
 			return nil, err
 		}
