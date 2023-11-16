@@ -1,2 +1,0 @@
-tweets (tweet_id int, sentiment string, content embtext)
-tweets_mini (tweet_id int, sentiment string, content embtext)

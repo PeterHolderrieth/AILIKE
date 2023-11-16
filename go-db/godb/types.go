@@ -60,7 +60,7 @@ func updateConfigurationVariables() {
 	if UseRandomProj {
 		TextEmbeddingDim = 32
 	} else {
-		TextEmbeddingDim = 768
+		TextEmbeddingDim = 384
 	}
 	EmbeddingSizeBytes = TextEmbeddingDim * FloatSizeBytes
 	TextSizeBytes = EmbeddingSizeBytes + TextCharLength
