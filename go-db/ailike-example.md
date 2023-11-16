@@ -47,5 +47,5 @@ Perform queries! Examples:
 - With a coloumn: `select tweet_id, sentiment, (content ailike content) sim from tweets_mini order by sim limit 5;`
 
 Other examples:
-- `select count(*) from tweets_mini;`
-- `explain select tweet_id, sentiment, (content ailike 'I am feeling really tired') sim from tweets_mini order by sim limit 5;`
+- select count(*) from tweets_mini;
+- explain select tweet_id, sentiment, (content ailike 'I am feeling really tired') sim from tweets_mini order by sim limit 5;
