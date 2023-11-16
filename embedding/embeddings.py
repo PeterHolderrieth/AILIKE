@@ -26,23 +26,40 @@ import warnings
 import pickle
 
 #Make script deterministic:
-torch.manual_seed
+DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+#As a model, we currently use the BAAI General Embedding (BGE) small model:
+#These models are trained as follows:
+# 1. Pre-training: LLMs based on masked auto-encoders with a one-layer decoder
+# 2. Fine-tuning: contrastive learning fine-tuning for negative/positive similarity examples
+# Resources:
+# RetroMAE (pre-trained model): https://arxiv.org/pdf/2205.12035.pdf
+# FlagEmbedding (fine-tuned model): https://github.com/FlagOpen/FlagEmbedding
+model_ckpt = "BAAI/bge-small-en-v1.5"
+#model_ckpt = "BAAI/bge-base-en-v1.5" #Larger BGE model
+#model_ckpt = "sentence-transformers/multi-qa-mpnet-base-dot-v1" #MPNET from 2020
 
 #Initialize model
-model_name = "bert-base-uncased"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModel.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_ckpt)
+model = AutoModel.from_pretrained(model_ckpt)
 
+
+def cls_pooling(model_output: torch.Tensor):
+    return model_output.last_hidden_state[:, 0]
 
 # Select pre-trained model
 def generate_embedding(sentence: str, random_proj: bool = False):
 
-    tokens = tokenizer(sentence, return_tensors="pt")
+    tokens = tokenizer(sentence, padding=True, truncation=True, return_tensors="pt")
+    
+    encoded_input = {k: v.to(DEVICE) for k, v in tokens.items()}
+
     outputs = model(**tokens)
-    embeddings = outputs.last_hidden_state[0].mean(axis=0).flatten()
+    embeddings = cls_pooling(outputs)
     if random_proj:
         embeddings = torch.matmul(embeddings,PROJ_MAT)
-    return embeddings.tolist()
+
+    return embeddings.squeeze().tolist()
 
 #Projection matrix if wanted:
 RANDOM_PROJ = False
@@ -71,5 +88,5 @@ def get_embedding():
 
 if __name__ == '__main__':
     if RANDOM_PROJ:
-        warnings.warn("You are computing embeddings ")
+        warnings.warn("You are projecting the embeddings with a random projection.")
     app.run(host='0.0.0.0', port=7010)

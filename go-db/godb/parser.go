@@ -460,7 +460,7 @@ func parseExpr(c *Catalog, expr sqlparser.Expr, alias string) (*LogicalSelectNod
 		outer := NewFuncSelectNode(opname, exprList, alias)
 		return &outer, nil
 	case *sqlparser.AilikeExpr:
-		
+
 		left, err := parseExpr(c, expr.Left, "")
 		if err != nil {
 			return nil, err
@@ -477,7 +477,7 @@ func parseExpr(c *Catalog, expr sqlparser.Expr, alias string) (*LogicalSelectNod
 		outer := NewFuncSelectNode("ailike", exprList, alias)
 		return &outer, nil
 	case *sqlparser.AilikeCosExpr:
-		
+
 		left, err := parseExpr(c, expr.Left, "")
 		if err != nil {
 			return nil, err
@@ -756,7 +756,7 @@ func (s *LogicalSelectNode) generateExpr(c *Catalog, inputDesc *TupleDesc, table
 		ce := ConstExpr{fval, constType}
 		return &ce, fieldName, nil
 	case ExprFunc:
-		
+
 		fieldName := *s.funcOp
 		isAilikeNode := false
 
@@ -769,8 +769,8 @@ func (s *LogicalSelectNode) generateExpr(c *Catalog, inputDesc *TupleDesc, table
 		exprs := make([]*Expr, len(s.args))
 		for i, lsn := range s.args {
 			newExpr, _, err := lsn.generateExpr(c, inputDesc, tableMap)
-			if isAilikeNode{
-				if lsn.exprType == ExprConst{
+			if isAilikeNode {
+				if lsn.exprType == ExprConst {
 					_, e := strconv.Atoi(lsn.value)
 					if e == nil {
 						return nil, "", GoDBError{TypeMismatchError, "Cannot perform an AILIKE op with integer literals."}
@@ -779,7 +779,7 @@ func (s *LogicalSelectNode) generateExpr(c *Catalog, inputDesc *TupleDesc, table
 						if err != nil {
 							return nil, "", GoDBError{FailedEmbedding, "Failed to produce a vector embedding."}
 						}
-						embeddedLiteral := EmbeddedStringField{Value : lsn.value, Emb: make([]float64, TextEmbeddingDim)}
+						embeddedLiteral := EmbeddedStringField{Value: lsn.value, Emb: make([]float64, TextEmbeddingDim)}
 						embeddedLiteral.Emb = embResp.Embedding
 						newExpr = &ConstExpr{embeddedLiteral, EmbeddedStringType}
 					}
