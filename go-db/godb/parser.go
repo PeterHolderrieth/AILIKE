@@ -1219,49 +1219,54 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 		}
 	}
 	if !selectAll {
-		// For now, only use vector index if we order-by similarity and limit results
-		// similarityExprs := make([]Expr, 0)
-		similarityFields := make(map[string][2]Expr, 0) // maps field names to the associated fieldExpr, constExprt
-		for i, expr := range exprList {
-			if e, ok := expr.(*FuncExpr); ok && e.op == "ailike" {
-				// we only use the index if we are comparing a constant embeded string
-				// against an embedded string column, and an index exists for that column
-				var constExpr *ConstExpr = nil
-				var fieldExpr *FieldExpr = nil
-				left, right := e.args[0], e.args[1]
-				if leftConstExpr, ok := (*left).(*ConstExpr); ok {
-					if rightFieldExpr, ok := (*right).(*FieldExpr); ok {
-						constExpr = leftConstExpr
-						fieldExpr = rightFieldExpr
+		/*
+			We can use the vector index if:
+			    - The first expression in the orderby clause refers to an ailike expression
+				- We are limiting results
+				- The args of the ailike expression are a field expression (column) and a constant expression
+				- there exists a vector index on the column involved in the ailike epxression
+		*/
+		var firstOrderByField *string = nil
+		var indexField *FieldExpr = nil
+		var queryVector *ConstExpr = nil
+		var ascending bool = false
+		if len(plan.orderByFields) > 0 {
+			orderByNode := *plan.orderByFields[0]
+			firstOrderByField = &(orderByNode.expr).field
+			ascending = orderByNode.ascending
+		}
+		for i, fieldName := range fieldNames {
+			if firstOrderByField != nil && fieldName == *firstOrderByField {
+				expr := exprList[i]
+				if e, ok := expr.(*FuncExpr); ok && e.op == "ailike" {
+					// One arg must be a FieldExpr, the other must be a ConstExpr
+					var constExpr *ConstExpr = nil
+					var fieldExpr *FieldExpr = nil
+					left, right := e.args[0], e.args[1]
+					if leftConstExpr, ok := (*left).(*ConstExpr); ok {
+						if rightFieldExpr, ok := (*right).(*FieldExpr); ok {
+							constExpr = leftConstExpr
+							fieldExpr = rightFieldExpr
+						}
 					}
-				}
-				if leftFieldExpr, ok := (*left).(*FieldExpr); ok {
-					if rightConstExpr, ok := (*right).(*ConstExpr); ok {
-						constExpr = rightConstExpr
-						fieldExpr = leftFieldExpr
+					if leftFieldExpr, ok := (*left).(*FieldExpr); ok {
+						if rightConstExpr, ok := (*right).(*ConstExpr); ok {
+							constExpr = rightConstExpr
+							fieldExpr = leftFieldExpr
+						}
 					}
-				}
-				if constExpr.constType != EmbeddedStringType || fieldExpr.selectField.Ftype != EmbeddedStringType {
-					return nil, GoDBError{ParseError, "Attempting to plan AILIKE operation with non-EmbededStringType."}
-				}
-				// TODO: we will need to check if the field has an index
-				if vectorIndexExists(fieldExpr.selectField, c) {
-					similarityFields[fieldNames[i]] = [2]Expr{fieldExpr, constExpr}
+					if constExpr.constType != EmbeddedStringType || fieldExpr.selectField.Ftype != EmbeddedStringType {
+						return nil, GoDBError{ParseError, "Attempting to plan AILIKE operation with non-EmbededStringType."}
+					}
+					// TODO: we will need to check if the field has an index
+					if vectorIndexExists(fieldExpr.selectField, c) {
+						indexField = fieldExpr
+						queryVector = constExpr
+					}
 				}
 			}
 		}
 
-		var indexField *FieldExpr = nil
-		var queryVector *ConstExpr = nil
-		var ascending bool = false
-		for _, orderByNode := range plan.orderByFields {
-			field := (*orderByNode.expr).field
-			if exprs, ok := similarityFields[field]; ok {
-				indexField = (exprs[0]).(*FieldExpr)
-				queryVector = (exprs[1]).(*ConstExpr)
-				ascending = orderByNode.ascending
-			}
-		}
 		heapFile, topOpIsHeapFile := (topOp).(*HeapFile)
 		if plan.limit != nil && indexField != nil && queryVector != nil && topOpIsHeapFile {
 			limitExpr, _, err := plan.limit.generateExpr(c, topOp.Descriptor(), tableMap)
