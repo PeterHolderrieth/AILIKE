@@ -40,5 +40,5 @@ func (v *VectorIndex) PrettyPrint() string {
 	if v.ascending {
 		orderString = "ascending"
 	}
-	return fmt.Sprintf("{column: %v, table: %v, liimit: %v, query: %v, %v}", v.indexField.Fname, v.indexField.TableQualifier, limit, query, orderString)
+	return fmt.Sprintf("{column: %v, table: %v, limit: %v, %v, query: %v}", v.indexField.Fname, v.indexField.TableQualifier, limit, orderString, query)
 }
