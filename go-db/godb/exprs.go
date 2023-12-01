@@ -13,7 +13,7 @@ import (
 //other values from tuples.
 
 type Expr interface {
-	EvalExpr(t *Tuple) (DBValue, error) //DBValue is either IntField, StringField, or EmbeddedStringField
+	EvalExpr(t *Tuple) (DBValue, error) //DBValue is either IntField, StringField, EmbeddedStringField, or EmbeddingField
 	GetExprType() FieldType             //Return the type of the Expression
 }
 
@@ -36,7 +36,7 @@ func (f *FieldExpr) GetExprType() FieldType {
 }
 
 type ConstExpr struct {
-	val       any //should be an IntField, EmbeddedStringField, or a StringField
+	val       any //should be an IntField, EmbeddedStringField, EmbeddingField, or a StringField
 	constType DBType
 }
 
@@ -242,7 +242,10 @@ func (f *FuncExpr) EvalExpr(t *Tuple) (DBValue, error) {
 			argvals[i] = val.(StringField).Value
 		case EmbeddedStringType:
 			argvals[i] = val.(EmbeddedStringField)
+		case EmbeddedFieldType:
+			argvals[i] = val.(EmbeddedField)
 		}
+
 	}
 	result := fType.f(argvals)
 	switch fType.outType {
@@ -251,6 +254,8 @@ func (f *FuncExpr) EvalExpr(t *Tuple) (DBValue, error) {
 	case StringType:
 		return StringField{result.(string)}, nil
 	case EmbeddedStringType:
+		return IntField{result.(int64)}, nil //We have never have expressions that result in text fields.
+	case EmbeddedFieldType:
 		return IntField{result.(int64)}, nil //We have never have expressions that result in text fields.
 	}
 	return nil, GoDBError{ParseError, "unknown result type in function"}
