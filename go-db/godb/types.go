@@ -27,6 +27,7 @@ const (
 	IllegalTransactionError GoDBErrorCode = iota
 	FailedEmbedding         GoDBErrorCode = iota
 	UnknownClusterError     GoDBErrorCode = iota
+	OSError                 GoDBErrorCode = iota
 )
 
 type GoDBError struct {
