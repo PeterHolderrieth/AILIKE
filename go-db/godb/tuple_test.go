@@ -66,6 +66,23 @@ func TestTextTupleSerialization(t *testing.T) {
 	}
 }
 
+func TestVecTupleSerialization(t *testing.T) {
+	td, t1, t2, _, _, _ := makeVecTestVars()
+	testTuples := [2]Tuple{t1, t2}
+
+	for _, tup := range testTuples {
+		b := new(bytes.Buffer)
+		tup.writeTo(b)
+		t3, err := readTupleFrom(b, &td)
+		if err != nil {
+			t.Fatalf("Error loading tuple from saved buffer: %s", err.Error())
+		}
+		if !t3.equals(&tup) {
+			t.Errorf("Serialization / deserialization doesn't result in identical tuple.")
+		}
+	}
+}
+
 // Unit test for Tuple.compareField()
 func TestTupleExpr(t *testing.T) {
 	td, t1, t2, _, _, _ := makeTestVars()

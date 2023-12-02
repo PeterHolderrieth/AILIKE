@@ -20,9 +20,10 @@ const (
 	IntType            DBType = iota
 	StringType         DBType = iota
 	EmbeddedStringType DBType = iota
+	VectorFieldType  DBType = iota
 )
 
-var typeNames map[DBType]string = map[DBType]string{IntType: "int", StringType: "string", EmbeddedStringType: "text"}
+var typeNames map[DBType]string = map[DBType]string{IntType: "int", StringType: "string", EmbeddedStringType: "text", VectorFieldType: "vec"}
 
 // FieldType is the type of a field in a tuple, e.g., its name, table, and [godb.DBType].
 // TableQualifier may or may not be an emtpy string, depending on whether the table
@@ -116,6 +117,7 @@ func (desc *TupleDesc) merge(desc2 *TupleDesc) *TupleDesc {
 
 // Gives the byte size of a Tuple with the given TupleDesc desc
 func (desc *TupleDesc) sizeInBytes() int {
+	var numVec int = 0
 	var numTexts int = 0
 	var numStrings int = 0
 	var numInts int = 0
@@ -127,11 +129,13 @@ func (desc *TupleDesc) sizeInBytes() int {
 			numStrings += 1
 		case EmbeddedStringType:
 			numTexts += 1
+		case VectorFieldType:
+			numVec += 1
 		default:
 			panic("Cannot get size in bytes for unknown field type.")
 		}
 	}
-	return StringLength*numStrings + IntSizeBytes*numInts + numTexts*TextSizeBytes
+	return StringLength*numStrings + IntSizeBytes*numInts + numTexts*TextSizeBytes + numVec*EmbeddingSizeBytes
 }
 
 // ================== Tuple Methods ======================
@@ -156,6 +160,11 @@ type StringField struct {
 // String field value
 type EmbeddedStringField struct {
 	Value string
+	Emb   EmbeddingType
+}
+
+// String field value
+type VectorField struct {
 	Emb   EmbeddingType
 }
 
@@ -220,13 +229,24 @@ func (t *Tuple) writeTo(b *bytes.Buffer) error {
 					return err
 				}
 			}
-
 			//Add text
 			TextBytes := make([]byte, TextCharLength)
 			copy(TextBytes, []byte(f.Value))
 			err := binary.Write(b, binary.LittleEndian, TextBytes)
 			if err != nil {
 				return err
+			}
+		case VectorField:
+			if t.Desc.Fields[i].Ftype != VectorFieldType {
+				return GoDBError{TypeMismatchError, "Tuple's fields do not match its descriptor."}
+			}
+
+			//Add embedding
+			for _, embValue := range f.Emb {
+				err := binary.Write(b, binary.LittleEndian, embValue)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -291,6 +311,17 @@ func readTupleFrom(b *bytes.Buffer, desc *TupleDesc) (*Tuple, error) {
 			}
 			nextText = string(bytes.TrimRight(textBytes, "\x00"))
 			tupleFields[i] = EmbeddedStringField{Value: nextText, Emb: emb}
+		case VectorFieldType:
+			//Read embedding
+			var emb EmbeddingType
+			for i := 0; i < TextEmbeddingDim; i++ {
+				err := binary.Read(b, binary.LittleEndian, &nextFloat)
+				if err != nil {
+					return nil, err
+				}
+				emb = append(emb, nextFloat)
+			}
+			tupleFields[i] = VectorField{Emb: emb}
 		}
 	}
 	return &Tuple{Desc: *desc, Fields: tupleFields}, nil
@@ -320,6 +351,13 @@ func (t1 *Tuple) equals(t2 *Tuple) bool {
 		//we assume embeddings will have equal value so we only check the text/value field
 		case EmbeddedStringType:
 			if t1.Fields[i].(EmbeddedStringField).Value != t2.Fields[i].(EmbeddedStringField).Value {
+				return false
+			}
+		
+		case VectorFieldType:
+			emb1 := t1.Fields[i].(VectorField).Emb
+			emb2 := t2.Fields[i].(VectorField).Emb
+			if !equal(&emb1, &emb2) {
 				return false
 			}
 		}
@@ -397,6 +435,27 @@ func (t *Tuple) compareField(t2 *Tuple, field Expr) (orderByState, error) {
 		if v1 < v2 {
 			return OrderedLessThan, nil
 		} else if v1 == v2 {
+			return OrderedEqual, nil
+		}
+		return OrderedGreaterThan, nil
+	case VectorFieldType:
+		v1 := e1.(VectorField).Emb
+		v2 := e2.(VectorField).Emb
+
+		// Compare using magnitude
+		v1_dist := float64(0);
+		for _, val := range v1{
+			v1_dist += val * val;
+		}
+
+		v2_dist := float64(0);
+		for _, val := range v2{
+			v2_dist += val * val;
+		}
+
+		if v1_dist < v2_dist {
+			return OrderedLessThan, nil
+		} else if v1_dist == v2_dist {
 			return OrderedEqual, nil
 		}
 		return OrderedGreaterThan, nil

@@ -1,6 +1,7 @@
 package godb
 
 import (
+	"math/rand"
 	"os"
 	"testing"
 )
@@ -67,6 +68,53 @@ func makeTextTestVars() (TupleDesc, Tuple, Tuple, *HeapFile, *BufferPool, Transa
 			EmbeddedStringField{Value: "George is a wedding photographer. He loves capturing the best headshots.",
 				Emb: make([]float64, TextEmbeddingDim)},
 		}}
+
+	bp := NewBufferPool(3)
+	os.Remove(TestingFile)
+	hf, err := NewHeapFile(TestingFile, &td, bp)
+	if err != nil {
+		print("ERROR MAKING TEST VARS, BLARGH")
+		panic(err)
+	}
+
+	tid := NewTID()
+	bp.BeginTransaction(tid)
+
+	return td, t1, t2, hf, bp, tid
+
+}
+
+func makeVecTestVars() (TupleDesc, Tuple, Tuple, *HeapFile, *BufferPool, TransactionID) {
+	var td = TupleDesc{Fields: []FieldType{
+		{Fname: "name", Ftype: StringType},
+		{Fname: "age", Ftype: IntType},
+		{Fname: "biography", Ftype: VectorFieldType},
+	}}	
+
+	// Initialize with random numbers
+	emb1 := make([]float64, TextEmbeddingDim)
+	emb2 := make([]float64, TextEmbeddingDim)
+	
+	for i := 1; i < TextEmbeddingDim; i++ {
+		emb1[i] = rand.Float64();
+		emb2[i] = rand.Float64();
+	}
+
+	var t1 = Tuple{
+		Desc: td,
+		Fields: []DBValue{
+			StringField{"sam"},
+			IntField{25},
+			VectorField{Emb: emb1}},
+	}
+
+	var t2 = Tuple{
+		Desc: td,
+		Fields: []DBValue{
+			StringField{"george jones"},
+			IntField{999},
+			VectorField{Emb: emb2}},
+	}
 
 	bp := NewBufferPool(3)
 	os.Remove(TestingFile)
