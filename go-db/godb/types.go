@@ -40,10 +40,12 @@ func (e GoDBError) Error() string {
 }
 
 const (
-	StringLength   int = 32
-	TextCharLength int = 120
-	FloatSizeBytes int = int(unsafe.Sizeof(float64(0.0)))
-	IntSizeBytes   int = int(unsafe.Sizeof(int64(0)))
+	StringLength   int     = 32
+	TextCharLength int     = 120
+	FloatSizeBytes int     = int(unsafe.Sizeof(float64(0.0)))
+	IntSizeBytes   int     = int(unsafe.Sizeof(int64(0)))
+	MaxIterKMeans  int     = 10
+	DeltaThrKMeans float64 = 1.0
 )
 
 var (
