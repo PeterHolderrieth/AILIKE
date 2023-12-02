@@ -36,7 +36,7 @@ func ConstructIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nClu
 	if err != nil {
 		return nil, err
 	}
-
+	clustering.Print()
 	//Insert all centroids and elements into the data file
 
 	//Insert all centroids and elements into the data file
