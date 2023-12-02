@@ -906,8 +906,8 @@ func PrintPhysicalPlan(o Operator, indent string) {
 		PrintPhysicalPlan(op.child, indent)
 	case *HeapFile:
 		fmt.Printf("%sHeap Scan %v\n", indent, getStrFromObj(op))
-	case *VectorIndex:
-		fmt.Printf("%sVectorIndex Scan %v\n", indent, op.PrettyPrint())
+	case *NNScan:
+		fmt.Printf("%sNN Index Scan %v\n", indent, op.PrettyPrint())
 	case *OrderBy:
 		orderStr := ""
 		for _, ex := range op.orderBy {
@@ -1247,9 +1247,9 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 			if err != nil {
 				return nil, GoDBError{ParseError, "Could not determine limit for vector index."}
 			}
-			vectorIndex, err := NewVectorIndex(*heapFile, limitExpr, (*indexField).selectField, *queryVector, ascending)
+			vectorIndex, err := NewNNScan(*heapFile, limitExpr, (*indexField).selectField, *queryVector, ascending)
 			if err != nil {
-				return nil, GoDBError{ParseError, "Could not create VectorIndex"}
+				return nil, GoDBError{ParseError, "Could not create NNScan"}
 			}
 			topOp = vectorIndex
 		}
@@ -1306,9 +1306,9 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 			if err != nil {
 				return nil, GoDBError{ParseError, "Could not determine limit for vector index."}
 			}
-			vectorIndex, err := NewVectorIndex(*heapFile, limitExpr, (*indexField).selectField, *queryVector, ascending)
+			vectorIndex, err := NewNNScan(*heapFile, limitExpr, (*indexField).selectField, *queryVector, ascending)
 			if err != nil {
-				return nil, GoDBError{ParseError, "Could not create VectorIndex"}
+				return nil, GoDBError{ParseError, "Could not create NNScan"}
 			}
 			topOp = vectorIndex
 		}
