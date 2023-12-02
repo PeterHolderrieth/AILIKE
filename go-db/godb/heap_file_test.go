@@ -88,7 +88,7 @@ func makeVecTestVars() (TupleDesc, Tuple, Tuple, *HeapFile, *BufferPool, Transac
 	var td = TupleDesc{Fields: []FieldType{
 		{Fname: "name", Ftype: StringType},
 		{Fname: "age", Ftype: IntType},
-		{Fname: "biography", Ftype: EmbeddedFieldType},
+		{Fname: "biography", Ftype: VectorFieldType},
 	}}	
 
 	// Initialize with random numbers
@@ -105,7 +105,7 @@ func makeVecTestVars() (TupleDesc, Tuple, Tuple, *HeapFile, *BufferPool, Transac
 		Fields: []DBValue{
 			StringField{"sam"},
 			IntField{25},
-			EmbeddedField{Emb: emb1}},
+			VectorField{Emb: emb1}},
 	}
 
 	var t2 = Tuple{
@@ -113,7 +113,7 @@ func makeVecTestVars() (TupleDesc, Tuple, Tuple, *HeapFile, *BufferPool, Transac
 		Fields: []DBValue{
 			StringField{"george jones"},
 			IntField{999},
-			EmbeddedField{Emb: emb2}},
+			VectorField{Emb: emb2}},
 	}
 
 	bp := NewBufferPool(3)
