@@ -6,6 +6,8 @@ import (
 	"testing"
 )
 
+const VerboseClusterTests = false
+
 func getSquareCornerEmb() ([]EmbeddingType, []recordID) {
 	embeddings := []EmbeddingType{EmbeddingType{1.0, -1.0},
 		EmbeddingType{-1.0, 1.0},
@@ -68,15 +70,13 @@ func TestGetSliceOperator(t *testing.T) {
 	operator := getSliceOperator()
 	tdesc := operator.Descriptor()
 	getterFunc := GetSimpleGetterFunc(tdesc.Fields[0].Fname)
-	fmt.Println("operator.Descriptor(): ", tdesc)
 	iterator, err := operator.Iterator(NewTID())
 	if err != nil {
 		t.Errorf("Error.")
 	}
 	itCounter := 0
-	verbose := true
 	for newTuple, _ := iterator(); newTuple != nil; newTuple, _ = iterator() {
-		if verbose {
+		if VerboseClusterTests {
 			fmt.Println("newTuple: ", newTuple)
 			embedding, _ := getterFunc(newTuple)
 			fmt.Println("Embedding: ", embedding)
@@ -91,16 +91,14 @@ func TestGetSliceOperator(t *testing.T) {
 func TestNewClustering(t *testing.T) {
 
 	embeddings, record_ids := getSquareCornerEmb()
-	clustering := newClustering(4, 2)
+	clustering := newClustering(4, 2, true)
 
 	if clustering.NCentroids() != 0 {
 		t.Fatalf("Expected zero clusters upon initialisation.")
 	}
 
 	for idx := 0; idx < len(embeddings); idx++ {
-		fmt.Println("Adding records: ", record_ids[idx])
-		fmt.Println("adding embedding: ", embeddings[idx])
-		err := clustering.addRecordToClustering(record_ids[idx], &embeddings[idx])
+		_, _, err := clustering.addRecordToClustering(record_ids[idx], &embeddings[idx])
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
@@ -108,15 +106,14 @@ func TestNewClustering(t *testing.T) {
 			t.Fatalf("Expected %d clusters upon initialisation.", idx)
 		}
 	}
-	verbose := true
-	if verbose {
+	if VerboseClusterTests {
 		fmt.Println("***************")
 		fmt.Println("Found clustering :")
 		clustering.Print()
 		fmt.Println("***************")
 	}
-	clustering.updateAllCentroidVectors()
-	if verbose {
+	clustering.updateAutomaticAllCentroidVectors()
+	if VerboseClusterTests {
 		fmt.Println("***************")
 		fmt.Println("Resulting clustering :")
 		clustering.Print()
@@ -124,7 +121,7 @@ func TestNewClustering(t *testing.T) {
 	}
 
 	clustering.deleteAllMembers()
-	if verbose {
+	if VerboseClusterTests {
 		fmt.Println("***************")
 		fmt.Println("Deleted all members:")
 		clustering.Print()
@@ -136,12 +133,14 @@ func TestKMeansClusteringSmall(t *testing.T) {
 	operator := getSliceOperator()
 	tdesc := operator.Descriptor()
 	getterFunc := GetSimpleGetterFunc(tdesc.Fields[0].Fname)
-	clustering, err := KMeansClustering(&operator, 4, 2, 10, 1.0, getterFunc)
+	clustering, err := KMeansClustering(&operator, 4, 2, 10, 1.0, getterFunc, true)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	fmt.Println("FOUND CLUSTERING: ")
-	clustering.Print()
+	if VerboseClusterTests {
+		fmt.Println("FOUND CLUSTERING: ")
+		clustering.Print()
+	}
 }
 
 func GetTestHeapFileIterator() (*HeapFile, *BufferPool, error) {
@@ -215,7 +214,9 @@ func TestKMeansHeapFile(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	getterFunc := GetSimpleGetterFunc("content")
-	clustering, err := KMeansClustering(hfile, 1000, TextEmbeddingDim, 1, 1.0, getterFunc)
+	clustering, err := KMeansClustering(hfile, 1000, TextEmbeddingDim, 1, 1.0, getterFunc, false)
 
-	clustering.SampleHeapFileClusteringPrint(hfile, bp, 10)
+	if VerboseClusterTests {
+		clustering.SampleHeapFileClusteringPrint(hfile, bp, 10)
+	}
 }
