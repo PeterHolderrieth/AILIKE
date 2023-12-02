@@ -1503,7 +1503,7 @@ func processDDL(c *Catalog, ddl *sqlparser.DDL) (QueryType, error) {
 			case "embtext":
 				colType = EmbeddedStringType
 			case "embvec":
-				colType = EmbeddedFieldType
+				colType = VectorFieldType
 			default:
 				return UnknownQueryType, GoDBError{ParseError, fmt.Sprintf("unsupported column type %s", col.Type.Type)}
 

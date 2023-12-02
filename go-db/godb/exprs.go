@@ -242,8 +242,8 @@ func (f *FuncExpr) EvalExpr(t *Tuple) (DBValue, error) {
 			argvals[i] = val.(StringField).Value
 		case EmbeddedStringType:
 			argvals[i] = val.(EmbeddedStringField)
-		case EmbeddedFieldType:
-			argvals[i] = val.(EmbeddedField)
+		case VectorFieldType:
+			argvals[i] = val.(VectorField)
 		}
 
 	}
@@ -255,7 +255,7 @@ func (f *FuncExpr) EvalExpr(t *Tuple) (DBValue, error) {
 		return StringField{result.(string)}, nil
 	case EmbeddedStringType:
 		return IntField{result.(int64)}, nil //We have never have expressions that result in text fields.
-	case EmbeddedFieldType:
+	case VectorFieldType:
 		return IntField{result.(int64)}, nil //We have never have expressions that result in text fields.
 	}
 	return nil, GoDBError{ParseError, "unknown result type in function"}
