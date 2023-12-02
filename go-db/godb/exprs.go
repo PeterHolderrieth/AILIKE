@@ -94,7 +94,7 @@ var funcs = map[string]FuncType{
 	"imax":                  {[]DBType{IntType, IntType}, IntType, maxFunc},
 	"ailike":                {[]DBType{EmbeddedStringType, EmbeddedStringType}, IntType, ailikeFunc},
 	"ailike_cos":            {[]DBType{EmbeddedStringType, EmbeddedStringType}, IntType, ailikeCosFunc},
-	"ailike_vec":            {[]DBType{VectorFieldType, VectorFieldType}, IntType, ailikeVecFunc},
+	"ailike_vec":            {[]DBType{VectorFieldType, EmbeddedStringType}, IntType, ailikeVecFunc},
 }
 
 func ListOfFunctions() string {
@@ -289,8 +289,8 @@ func ailikeCosFunc(args []any) any {
 }
 
 func ailikeVecFunc(args []any) any {
-	v1 := args[0].(VectorFieldType).Emb
-	v2 := args[1].(VectorFieldType).Emb
+	v1 := args[0].(VectorField).Emb
+	v2 := args[1].(EmbeddedStringField).Emb
 
 	r, err := dotProduct(&v1, &v2)
 
