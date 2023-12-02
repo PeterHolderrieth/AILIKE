@@ -2,6 +2,7 @@ package godb
 
 import (
 	"fmt"
+	"os"
 	"testing"
 )
 
@@ -141,4 +142,80 @@ func TestKMeansClusteringSmall(t *testing.T) {
 	}
 	fmt.Println("FOUND CLUSTERING: ")
 	clustering.Print()
+}
+
+func GetTestHeapFileIterator() (*HeapFile, *BufferPool, error) {
+
+	resetFile := false
+	bp := NewBufferPool(1000)
+	td := &TupleDesc{Fields: []FieldType{
+		FieldType{Fname: "tweet_id", Ftype: IntType},
+		FieldType{Fname: "sentiment", Ftype: StringType},
+		FieldType{Fname: "content", Ftype: EmbeddedStringType}}}
+
+	if resetFile {
+
+		err := os.Remove("kmeans_test.dat")
+		if err != nil {
+			panic(err.Error())
+		}
+		hf, err := NewHeapFile("kmeans_test.dat", td, bp)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		f, err := os.Open("../../data/tweets/tweets_mini.csv")
+		if err != nil {
+			return nil, nil, err
+		}
+		err = hf.LoadFromCSV(f, true, ",", false)
+		if err != nil {
+			return nil, nil, err
+		}
+		return hf, bp, nil
+
+	} else {
+		hf, err := NewHeapFile("kmeans_test.dat", td, bp)
+		if err != nil {
+			return nil, nil, err
+		}
+		return hf, bp, nil
+	}
+}
+
+func (c *Clustering) SampleHeapFileClusteringPrint(hf *HeapFile, bp *BufferPool, nSamples int) {
+	for key, _ := range c.centroidEmbs {
+		fmt.Println("Cluster ID: ", key)
+		fmt.Println("Members: ")
+		//Print records in that cluster:
+		count := 0
+		for _, z := range c.clusterMemb[key] {
+			hrid := z.rid.(heapRecordId)
+			page, err := bp.GetPage(hf, hrid.pageNo, NewTID(), ReadPerm)
+			if err != nil {
+				panic(err.Error())
+			}
+			hpage := (*page).(*heapPage)
+			tuple := hpage.records[hrid.slotNo]
+			fmt.Println(tuple.PrettyPrintString(false))
+			if count > nSamples {
+				break
+			}
+			count++
+		}
+		fmt.Println("Cluster quality: ", c.sumClusterDist[key])
+	}
+	fmt.Println("Total distance to centroids: ", c.TotalDist())
+	fmt.Println("")
+}
+
+func TestKMeansHeapFile(t *testing.T) {
+	hfile, bp, err := GetTestHeapFileIterator()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	getterFunc := GetSimpleGetterFunc("content")
+	clustering, err := KMeansClustering(hfile, 1000, TextEmbeddingDim, 1, 1.0, getterFunc)
+
+	clustering.SampleHeapFileClusteringPrint(hfile, bp, 10)
 }

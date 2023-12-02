@@ -52,6 +52,14 @@ func (c *Clustering) NCentroids() int {
 	return len(c.centroidEmbs)
 }
 
+func (c *Clustering) TotalNMembers() int {
+	n_members := 0
+	for _, x := range c.clusterMemb {
+		n_members += len(x)
+	}
+	return n_members
+}
+
 func (c *Clustering) TotalDist() float64 {
 	sumDist := float64(0.0)
 	for _, dist := range c.sumClusterDist {
@@ -170,11 +178,11 @@ func KMeansClustering(op Operator, nClusters int, embDim int,
 	embGetterFunc func(t *Tuple) (*EmbeddingType, error)) (*Clustering, error) {
 
 	clustering := newClustering(nClusters, embDim)
-
 	nIteration := 0
 	//currError := deltaThr
 
 	for (nIteration < maxIterations) && (true) {
+		fmt.Println("Total n members: ", clustering.TotalNMembers())
 		//Renew iterator
 		iterator, err := op.Iterator(NewTID())
 		if err != nil {
@@ -196,7 +204,10 @@ func KMeansClustering(op Operator, nClusters int, embDim int,
 			if err != nil {
 				return nil, err
 			}
+			//fmt.Println("Total n members before adding first record: ", clustering.TotalNMembers())
 			clustering.addRecordToClustering((*newTuple).Rid, newEmb)
+			//fmt.Println("Total n members after adding first record: ", clustering.TotalNMembers())
+			//break
 		}
 
 		// Update all centroid vectors
@@ -204,14 +215,5 @@ func KMeansClustering(op Operator, nClusters int, embDim int,
 
 		nIteration += 1
 	}
-
 	return clustering, nil
 }
-
-//Function to reassign elements from an iterator
-// - Could be heapFile iterator
-// - Or could be Clustering iterator
-
-//Function to add elements/tuples from heapFile iterator into clustering
-
-//How do I avoid re-insertion???
