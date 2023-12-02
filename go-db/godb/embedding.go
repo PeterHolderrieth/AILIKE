@@ -104,6 +104,11 @@ func dotProduct(v1, v2 *EmbeddingType) (float64, error) {
 	return dotprod, nil
 }
 
+func NegativeDotProduct(v1, v2 *EmbeddingType) (float64, error) {
+	dp, err := dotProduct(v1, v2)
+	return -dp, err
+}
+
 func CosDist(v1, v2 *EmbeddingType) (float64, error) {
 
 	if len(*v1) != len(*v2) {
@@ -126,6 +131,15 @@ func CosDist(v1, v2 *EmbeddingType) (float64, error) {
 	return cosdist, nil
 }
 
+func MSEDist(e1, e2 *EmbeddingType) (float64, error) {
+	sum_dist := float64(0.0)
+	for idx, e1_idx := range *e1 {
+		e2_idx := (*e2)[idx]
+		sum_dist += (e1_idx - e2_idx) * (e1_idx - e2_idx)
+	}
+	return sum_dist / float64(len(*e1)), nil
+}
+
 func equal(v1, v2 *EmbeddingType) bool {
 
 	if len(*v1) != len(*v2) {
@@ -133,11 +147,11 @@ func equal(v1, v2 *EmbeddingType) bool {
 	}
 
 	for i := 0; i < len(*v1); i++ {
-		if (*v1)[i] != (*v2)[i]{
-			return false;
+		if (*v1)[i] != (*v2)[i] {
+			return false
 		}
 	}
 
-	return true;
+	return true
 
 }
