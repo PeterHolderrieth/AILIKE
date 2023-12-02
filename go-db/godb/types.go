@@ -26,6 +26,7 @@ const (
 	DeadlockError           GoDBErrorCode = iota
 	IllegalTransactionError GoDBErrorCode = iota
 	FailedEmbedding         GoDBErrorCode = iota
+	UnknownClusterError     GoDBErrorCode = iota
 )
 
 type GoDBError struct {

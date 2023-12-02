@@ -328,7 +328,6 @@ func (f *HeapFile) flushPage(p *Page) error {
 // Supplied as argument to NewHeapFile.
 func (f *HeapFile) Descriptor() *TupleDesc {
 	return &f.desc
-
 }
 
 // [Operator] iterator method
