@@ -94,6 +94,7 @@ var funcs = map[string]FuncType{
 	"imax":                  {[]DBType{IntType, IntType}, IntType, maxFunc},
 	"ailike":                {[]DBType{EmbeddedStringType, EmbeddedStringType}, IntType, ailikeFunc},
 	"ailike_cos":            {[]DBType{EmbeddedStringType, EmbeddedStringType}, IntType, ailikeCosFunc},
+	"ailike_vec":            {[]DBType{VectorFieldType, EmbeddedStringType}, IntType, ailikeVecFunc},
 }
 
 func ListOfFunctions() string {
@@ -270,8 +271,8 @@ func ailikeFunc(args []any) any {
 	if err != nil {
 		panic("Failed to compute dot product in AILIKE")
 	}
-
-	return int64(r)
+	// Use the negative of the dot product to indicate similarity
+	return int64(-r)
 }
 
 func ailikeCosFunc(args []any) any {
@@ -285,4 +286,17 @@ func ailikeCosFunc(args []any) any {
 	}
 
 	return int64(r)
+}
+
+func ailikeVecFunc(args []any) any {
+	v1 := args[0].(VectorField).Emb
+	v2 := args[1].(EmbeddedStringField).Emb
+
+	r, err := dotProduct(&v1, &v2)
+
+	if err != nil {
+		panic("Failed to compute dot product in AILIKE")
+	}
+
+	return int64(-r)
 }

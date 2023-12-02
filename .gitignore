@@ -24,3 +24,4 @@ go.work
 
 # local data
 data/transitdb/*
+data/tweets/tweets.dat
