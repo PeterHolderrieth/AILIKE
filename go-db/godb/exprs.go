@@ -270,8 +270,8 @@ func ailikeFunc(args []any) any {
 	if err != nil {
 		panic("Failed to compute dot product in AILIKE")
 	}
-
-	return int64(r)
+	// Use the negative of the dot product to indicate similarity
+	return int64(-r)
 }
 
 func ailikeCosFunc(args []any) any {
