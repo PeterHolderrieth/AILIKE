@@ -48,7 +48,7 @@ type BufferPool struct {
 	exclusiveLockMap      map[BufferPoolKey]TransactionID // maps BufferPoolKeys to the TransactionID that is holding an exclusive lock
 	transactionWaitingFor map[TransactionID]Lock          // maps TransactionIDs to the Lock they are waiting for
 	transactionLocks      map[TransactionID]map[Lock]bool // maps TransactionIDs to the Locks they hold or have reserved
-
+	steal                 bool
 }
 
 // Create a new BufferPool with the specified number of pages
@@ -59,7 +59,7 @@ func NewBufferPool(numPages int) *BufferPool {
 	exclusiveLockMap := make(map[BufferPoolKey]TransactionID, 0)
 	transactionWaitingFor := make(map[TransactionID]Lock, 0)
 	transactionLocks := make(map[TransactionID]map[Lock]bool, 0)
-	return &BufferPool{numPages, pageMap, &mutex, sharedLockMap, exclusiveLockMap, transactionWaitingFor, transactionLocks}
+	return &BufferPool{numPages, pageMap, &mutex, sharedLockMap, exclusiveLockMap, transactionWaitingFor, transactionLocks, false}
 }
 
 func (bp *BufferPool) EvictPage() error {
@@ -70,7 +70,7 @@ func (bp *BufferPool) EvictPage() error {
 
 	// Evict page with the least number of empty slots
 	for k, page := range bp.pageMap {
-		if !page.isDirty() {
+		if !page.isDirty() || bp.steal {
 			if uint(page.getNumOpenSlots()) <= minOpenSlots {
 				minOpenSlots = uint(page.getNumOpenSlots())
 				evictK = k
@@ -149,7 +149,7 @@ func (bp *BufferPool) CommitTransaction(tid TransactionID) {
 			if page := bp.pageMap[lock.pageKey]; page != nil {
 				err := bp.pageMap[lock.pageKey].flushPage()
 				if err != nil {
-					panic("Unable to flush page when commiting transaction.")
+					panic("Unable to flush page when commiting transaction. " + err.Error())
 				}
 			}
 		}

@@ -143,27 +143,21 @@ func TestKMeansClusteringSmall(t *testing.T) {
 	}
 }
 
-func GetTestHeapFileIterator() (*HeapFile, *BufferPool, error) {
-
-	resetFile := false
+func GetTestHeapFile(csvPath string, resetFile bool) (*HeapFile, *BufferPool, error) {
 	bp := NewBufferPool(1000)
 	td := &TupleDesc{Fields: []FieldType{
-		FieldType{Fname: "tweet_id", Ftype: IntType},
-		FieldType{Fname: "sentiment", Ftype: StringType},
-		FieldType{Fname: "content", Ftype: EmbeddedStringType}}}
+		{Fname: "tweet_id", Ftype: IntType},
+		{Fname: "sentiment", Ftype: StringType},
+		{Fname: "content", Ftype: EmbeddedStringType}}}
 
 	if resetFile {
-
-		err := os.Remove("kmeans_test.dat")
-		if err != nil {
-			panic(err.Error())
-		}
+		os.Remove("kmeans_test.dat")
 		hf, err := NewHeapFile("kmeans_test.dat", td, bp)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		f, err := os.Open("../../data/tweets/tweets_mini.csv")
+		f, err := os.Open(csvPath)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -209,7 +203,7 @@ func (c *Clustering) SampleHeapFileClusteringPrint(hf *HeapFile, bp *BufferPool,
 }
 
 func TestKMeansHeapFile(t *testing.T) {
-	hfile, bp, err := GetTestHeapFileIterator()
+	hfile, bp, err := GetTestHeapFile("../../data/tweets/tweets_mini.csv", true)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}

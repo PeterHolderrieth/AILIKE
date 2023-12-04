@@ -27,6 +27,8 @@ type HeapFile struct {
 	// to whether or not that page is full. The value for pageFull[i] will
 	// default to false until the first time page i is read.
 	pageFull *sync.Map
+	// maps column names to indexes that exist for that column; we currently assume at most one index per column
+	indexes map[string]NNIndexFile
 }
 
 // Create a HeapFile.
@@ -42,7 +44,8 @@ func NewHeapFile(fromFile string, td *TupleDesc, bp *BufferPool) (*HeapFile, err
 		return nil, err
 	}
 	var pageFull sync.Map
-	return &HeapFile{fileName: fromFile, desc: *td.copy(), bufPool: bp, filePointer: filePointer, pageFull: &pageFull}, nil
+	indexes := make(map[string]NNIndexFile) // TODO(tally): populate indexes correctly
+	return &HeapFile{fileName: fromFile, desc: *td.copy(), bufPool: bp, filePointer: filePointer, pageFull: &pageFull, indexes: indexes}, nil
 }
 
 // Return the number of bytes in file
@@ -236,25 +239,7 @@ func (f *HeapFile) getPageForInsert(tid TransactionID) (*heapPage, error) {
 	}
 }
 
-// Add the tuple to the HeapFile.  This method should search through pages in
-// the heap file, looking for empty slots and adding the tuple in the first
-// empty slot if finds.
-//
-// If none are found, it should create a new [heapPage] and insert the tuple
-// there, and write the heapPage to the end of the HeapFile (e.g., using the
-// [flushPage] method.)
-//
-// To iterate through pages, it should use the [BufferPool.GetPage method]
-// rather than directly reading pages itself. For lab 1, you do not need to
-// worry about concurrent transactions modifying the Page or HeapFile.  We will
-// add support for concurrent modifications in lab 3.
-func (f *HeapFile) insertTuple(t *Tuple, tid TransactionID) error {
-
-	hp, err := f.getPageForInsert(tid)
-	if err != nil {
-		return err
-	}
-
+func (f *HeapFile) _insertTupleHelper(hp *heapPage, t *Tuple, tid TransactionID) error {
 	//Create embedding for every text field:
 	for i, field := range t.Desc.Fields {
 		if field.Ftype == EmbeddedStringType {
@@ -275,7 +260,91 @@ func (f *HeapFile) insertTuple(t *Tuple, tid TransactionID) error {
 	t.Rid = rid
 	f.pageFull.Store(hp.pageNo, hp.numOpenSlots == 0)
 
+	// Insert tuple into all associated indexes
+	for _, index := range f.indexes {
+		err = index.insertTuple(t, tid)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// Add the tuple to the HeapFile.  This method should search through pages in
+// the heap file, looking for empty slots and adding the tuple in the first
+// empty slot if finds.
+//
+// If none are found, it should create a new [heapPage] and insert the tuple
+// there, and write the heapPage to the end of the HeapFile (e.g., using the
+// [flushPage] method.)
+//
+// To iterate through pages, it should use the [BufferPool.GetPage method]
+// rather than directly reading pages itself. For lab 1, you do not need to
+// worry about concurrent transactions modifying the Page or HeapFile.  We will
+// add support for concurrent modifications in lab 3.
+func (f *HeapFile) insertTuple(t *Tuple, tid TransactionID) error {
+
+	hp, err := f.getPageForInsert(tid)
+	if err != nil {
+		return err
+	}
+	return f._insertTupleHelper(hp, t, tid)
+}
+
+// Add the tuple to the HeapFile to a specific page. If that page is full,
+// returns an error.
+func (f *HeapFile) insertTupleIntoPage(t *Tuple, pageNo int, tid TransactionID) error {
+
+	p, err := f.bufPool.GetPage(f, pageNo, tid, WritePerm)
+	if err != nil {
+		return err
+	}
+	hp := (*p).(*heapPage)
+	if hp.numOpenSlots <= 0 {
+		return GoDBError{PageFullError, "Cannot insert into full page."}
+	}
+	return f._insertTupleHelper(hp, t, tid)
+}
+
+// Add the tuple to the HeapFile to a new page. Returns the page number of the
+// new page.
+func (f *HeapFile) insertTupleIntoNewPage(t *Tuple, tid TransactionID) (int, error) {
+	var np *heapPage = nil
+	var newPageNo int = -1
+	for np == nil {
+		newPageNo = f.NumPages()
+
+		// It is possible a different thread has already created this page, so we try to get it.
+		// This also gets an exclusive lock on the new page number, preventing another transaction from creating the page.
+		// If this does not fail; that means another transaction already created the page, so we need
+		// to try and create another one.
+		_, err := f.bufPool.GetPage(f, newPageNo, tid, WritePerm)
+		if err == nil {
+			continue
+		} else {
+			// The new page didn't exist, so we create a new page now.
+			hp := newHeapPage(f.Descriptor(), newPageNo, f)
+			err = hp.flushPage() // flush the empty page to disk to update the page count
+			if err != nil {
+				return -1, err
+			}
+			// get new page from bufPool
+			p, err := f.bufPool.GetPage(f, newPageNo, tid, WritePerm)
+			if err != nil {
+				return -1, err
+			}
+			np = (*p).(*heapPage)
+		}
+	}
+
+	if np.numOpenSlots <= 0 {
+		return -1, GoDBError{PageFullError, "Cannot insert into full page."}
+	}
+	err := f._insertTupleHelper(np, t, tid)
+	if err != nil {
+		return -1, err
+	}
+	return newPageNo, nil
 }
 
 // Remove the provided tuple from the HeapFile.  This method should use the
@@ -301,6 +370,13 @@ func (f *HeapFile) deleteTuple(t *Tuple, tid TransactionID) error {
 		return err
 	}
 	f.pageFull.Store(hp.pageNo, false)
+
+	for _, index := range f.indexes {
+		err = index.deleteTuple(t, tid)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

@@ -1,5 +1,9 @@
 package godb
 
+import (
+	"os"
+)
+
 // TupleDesc for the heap file that stores the maping from vectors to heapRecordIds.
 // heapRecordIds are composed from filenames, pageNo, slotNo; we already know
 // the table's filename, so we don't need to store it in the dataHeapFile, though we could.
@@ -29,9 +33,9 @@ type NNIndexFile struct {
 	dataHeapFile *HeapFile
 	// We use another heap file to store centroid <-> centoidId mappings
 	centroidHeapFile *HeapFile
-	// We use a third heap file to store centroidId <-> pageNo, where pageNo is a page that contains 
-	// rows for the given centroid within the dataHeapFile 
-	mappingHeapFile *HeapFile 
+	// We use a third heap file to store centroidId <-> pageNo, where pageNo is a page that contains
+	// rows for the given centroid within the dataHeapFile
+	mappingHeapFile *HeapFile
 }
 
 // Create a NnIndexFile.
@@ -56,4 +60,192 @@ func NewNNIndexFileFile(tableFileName string, indexedColName string, fromDataFil
 		return nil, err
 	}
 	return &NNIndexFile{tableFileName, indexedColName, dataHeapFile, centroidHeapFile, mappingHeapFile}, nil
+}
+
+// Given an embedding, return an iterator that returns the [centroidId, pageNo] pairs ordered by distance between the centroid
+// and the embedding; multiple rows may have the same centroidId, but different pageNos.
+// Parameters
+// - e: the embedding to find the nearest cluster pages for
+// - ascending: if true, return the nearest cluster pages first; if false, return the farthest cluster pages first
+// - tid: the transaction id
+// - p (optional): the number of centroids to visit; if p is negative, visit all centroids
+func (f *NNIndexFile) getCentroidPageNoIterator(e EmbeddedStringField, ascending bool, tid TransactionID, p int) (func() ([2]int, error), error) {
+	var centroidIdFieldExpr Expr = &FieldExpr{FieldType{Fname: "centroidId", Ftype: IntType}}
+	var fe Expr = &FieldExpr{FieldType{Fname: "vector", Ftype: VectorFieldType}}
+	var ce Expr = &ConstExpr{e, EmbeddedStringType}
+	// TODO: support multiple distance metrics
+	var ailikeExpr Expr = &FuncExpr{"ailike_vec", []*Expr{&fe, &ce}}
+	proj, err := NewProjectOp([]Expr{centroidIdFieldExpr, ailikeExpr}, []string{"centroidId", "dist"}, false, f.centroidHeapFile)
+	if err != nil {
+		return nil, err
+	}
+	var distFieldExpr Expr = &FieldExpr{FieldType{Fname: "dist", Ftype: IntType}}
+	orderby, err := NewOrderBy([]Expr{distFieldExpr}, proj, []bool{true})
+	if err != nil {
+		return nil, err
+	}
+	var topOp Operator = orderby
+	if p > 0 {
+		topOp = NewLimitOp(&ConstExpr{IntField{int64(p)}, IntType}, orderby)
+	}
+	join, err := NewIntJoin(topOp, centroidIdFieldExpr, f.mappingHeapFile, centroidIdFieldExpr, 10)
+	if err != nil {
+		return nil, err
+	}
+
+	joinIter, err := join.Iterator(tid)
+	if err != nil {
+		return nil, err
+	}
+
+	var centoidId int
+	var pageNo int
+	return func() ([2]int, error) {
+		row, err := joinIter()
+		if err != nil {
+			return [2]int{-1, -1}, err
+		}
+		if row != nil {
+			centoidId = int(row.Fields[0].(IntField).Value)
+			pageNo = int(row.Fields[3].(IntField).Value)
+			return [2]int{centoidId, pageNo}, nil
+		}
+		return [2]int{-1, -1}, nil
+	}, nil
+}
+
+func (f *NNIndexFile) insertTuple(t *Tuple, tid TransactionID) error {
+	/*
+		Get the page using find centroid page
+		if the page is full, split the page and insert the tuple
+		if the page is not full, just insert the tuple
+	*/
+
+	if t.Rid.(heapRecordId).fileName != f.tableFileName {
+		return GoDBError{IncompatibleTypesError, "Index does not match table of tuple."}
+	}
+
+	var colIndex int = -1
+	for i, field := range t.Desc.Fields {
+		if field.Fname == f.indexedColName {
+			colIndex = i
+		}
+	}
+	if colIndex == -1 {
+		return GoDBError{IncompatibleTypesError, "Given tuple does not contain indexed column."}
+	}
+
+	var embeddingField EmbeddedStringField = t.Fields[colIndex].(EmbeddedStringField) // TODO: more type checking?
+	centroidPageNoIter, err := f.getCentroidPageNoIterator(embeddingField, true, tid, 1)
+	if err != nil {
+		return err
+	}
+	var inserted bool = false
+	var centroidId int
+	var pageNo int
+	var dt Tuple = Tuple{Desc: dataDesc, Fields: []DBValue{VectorField{embeddingField.Emb}, IntField{int64(t.Rid.(heapRecordId).pageNo)}, IntField{int64(t.Rid.(heapRecordId).slotNo)}}}
+
+	for row, err := centroidPageNoIter(); row[0] != -1; row, err = centroidPageNoIter() {
+		if err != nil {
+			return err
+		}
+		centroidId = row[0]
+		pageNo = row[1]
+		err = f.dataHeapFile.insertTupleIntoPage(&dt, pageNo, tid)
+		if err != nil {
+			if err.(GoDBError).code == PageFullError {
+				continue
+			}
+			return err
+		} else {
+			// successfully inserted tuple into a page
+			inserted = true
+			break
+		}
+	}
+	if !inserted {
+		newPageNo, err := f.dataHeapFile.insertTupleIntoNewPage(&dt, tid)
+		if err != nil {
+			return err
+		}
+		newMappingTuple := &Tuple{Desc: mappingDesc, Fields: []DBValue{IntField{int64(centroidId)}, IntField{int64(newPageNo)}}}
+		err = f.mappingHeapFile.insertTuple(newMappingTuple, tid)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Remove the provided tuple from the HeapFile.  This method should use the
+// [Tuple.Rid] field of t to determine which tuple to remove.
+// This method is only called with tuples that are read from storage via the
+// [Iterator] method, so you can so you can supply the value of the Rid
+// for tuples as they are read via [Iterator].  Note that Rid is an empty interface,
+// so you can supply any object you wish.  You will likely want to identify the
+// heap page and slot within the page that the tuple came from.
+func (f *NNIndexFile) deleteTuple(t *Tuple, tid TransactionID) error {
+	// TODO
+	return nil
+}
+
+func ConstructIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nClusters int, DataFile string, CentroidFile string, MappingFile string, bp *BufferPool) (*NNIndexFile, error) {
+	tid := NewTID()
+
+	//Create clustering
+	getterFunc := GetSimpleGetterFunc(indexedColName)
+	clustering, err := KMeansClustering(hfile, nClusters, TextEmbeddingDim,
+		MaxIterKMeans, DeltaThrKMeans, getterFunc, false)
+	if err != nil {
+		return nil, err
+	}
+
+	//Create data file
+	os.Remove(DataFile)
+	dataHeapFile, err := NewHeapFile(DataFile, &dataDesc, bp)
+	if err != nil {
+		return nil, err
+	}
+
+	//Create centroid file
+	os.Remove(CentroidFile)
+	centroidHeapFile, err := NewHeapFile(CentroidFile, &centroidDesc, bp)
+	if err != nil {
+		return nil, err
+	}
+
+	//Create mapping file
+	os.Remove(MappingFile)
+	mappingHeapFile, err := NewHeapFile(MappingFile, &mappingDesc, bp)
+	if err != nil {
+		return nil, err
+	}
+	nnif := &NNIndexFile{hfile.fileName, indexedColName, dataHeapFile, centroidHeapFile, mappingHeapFile}
+
+	// clustering.Print()
+	//Insert all centroids and elements into the data file
+	for centroidID, centroid := range clustering.centroidEmbs {
+		centroidTuple := Tuple{centroidDesc, []DBValue{VectorField{*centroid}, IntField{int64(centroidID)}}, nil}
+		err = nnif.centroidHeapFile.insertTuple(&centroidTuple, tid)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	iter, err := hfile.Iterator(tid)
+	if err != nil {
+		return nil, err
+	}
+	for t, err := iter(); t != nil || err != nil; t, err = iter() {
+		if err != nil {
+			return nil, err
+		}
+		err = nnif.insertTuple(t, tid)
+		if err != nil {
+			return nil, err
+		}
+	}
+	bp.CommitTransaction(tid)
+
+	return nnif, nil
 }
