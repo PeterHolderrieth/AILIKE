@@ -323,8 +323,8 @@ func (f *HeapFile) insertTupleIntoNewPage(t *Tuple, tid TransactionID) (int, err
 			continue
 		} else {
 			// The new page didn't exist, so we create a new page now.
-			np := newHeapPage(f.Descriptor(), newPageNo, f)
-			err = np.flushPage() // flush the empty page to disk to update the page count
+			hp := newHeapPage(f.Descriptor(), newPageNo, f)
+			err = hp.flushPage() // flush the empty page to disk to update the page count
 			if err != nil {
 				return -1, err
 			}

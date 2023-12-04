@@ -1,5 +1,9 @@
 package godb
 
+import (
+	"os"
+)
+
 // TupleDesc for the heap file that stores the maping from vectors to heapRecordIds.
 // heapRecordIds are composed from filenames, pageNo, slotNo; we already know
 // the table's filename, so we don't need to store it in the dataHeapFile, though we could.
@@ -71,7 +75,7 @@ func (f *NNIndexFile) getCentroidPageNoIterator(e EmbeddedStringField, ascending
 	var ce Expr = &ConstExpr{e, EmbeddedStringType}
 	// TODO: support multiple distance metrics
 	var ailikeExpr Expr = &FuncExpr{"ailike_vec", []*Expr{&fe, &ce}}
-	proj, err := NewProjectOp([]Expr{centroidIdFieldExpr, ailikeExpr}, []string{"centroidId", "dist"}, false, f.dataHeapFile)
+	proj, err := NewProjectOp([]Expr{centroidIdFieldExpr, ailikeExpr}, []string{"centroidId", "dist"}, false, f.centroidHeapFile)
 	if err != nil {
 		return nil, err
 	}
@@ -102,8 +106,8 @@ func (f *NNIndexFile) getCentroidPageNoIterator(e EmbeddedStringField, ascending
 			return [2]int{-1, -1}, err
 		}
 		if row != nil {
-			centoidId = int(row.Fields[4].(IntField).Value) //TODO: replace this with the correct index
-			pageNo = int(row.Fields[4].(IntField).Value)    //TODO: replace this with the correct index
+			centoidId = int(row.Fields[0].(IntField).Value)
+			pageNo = int(row.Fields[3].(IntField).Value)
 			return [2]int{centoidId, pageNo}, nil
 		}
 		return [2]int{-1, -1}, nil
@@ -139,6 +143,7 @@ func (f *NNIndexFile) insertTuple(t *Tuple, tid TransactionID) error {
 	var inserted bool = false
 	var centroidId int
 	var pageNo int
+	var dt Tuple = Tuple{Desc: dataDesc, Fields: []DBValue{VectorField{embeddingField.Emb}, IntField{int64(t.Rid.(heapRecordId).pageNo)}, IntField{int64(t.Rid.(heapRecordId).slotNo)}}}
 
 	for row, err := centroidPageNoIter(); row[0] != -1; row, err = centroidPageNoIter() {
 		if err != nil {
@@ -146,7 +151,7 @@ func (f *NNIndexFile) insertTuple(t *Tuple, tid TransactionID) error {
 		}
 		centroidId = row[0]
 		pageNo = row[1]
-		err = f.dataHeapFile.insertTupleIntoPage(t, pageNo, tid)
+		err = f.dataHeapFile.insertTupleIntoPage(&dt, pageNo, tid)
 		if err != nil {
 			if err.(GoDBError).code == PageFullError {
 				continue
@@ -159,7 +164,7 @@ func (f *NNIndexFile) insertTuple(t *Tuple, tid TransactionID) error {
 		}
 	}
 	if !inserted {
-		newPageNo, err := f.dataHeapFile.insertTupleIntoNewPage(t, tid)
+		newPageNo, err := f.dataHeapFile.insertTupleIntoNewPage(&dt, tid)
 		if err != nil {
 			return err
 		}
@@ -182,4 +187,65 @@ func (f *NNIndexFile) insertTuple(t *Tuple, tid TransactionID) error {
 func (f *NNIndexFile) deleteTuple(t *Tuple, tid TransactionID) error {
 	// TODO
 	return nil
+}
+
+func ConstructIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nClusters int, DataFile string, CentroidFile string, MappingFile string, bp *BufferPool) (*NNIndexFile, error) {
+	tid := NewTID()
+
+	//Create clustering
+	getterFunc := GetSimpleGetterFunc(indexedColName)
+	clustering, err := KMeansClustering(hfile, nClusters, TextEmbeddingDim,
+		MaxIterKMeans, DeltaThrKMeans, getterFunc, false)
+	if err != nil {
+		return nil, err
+	}
+
+	//Create data file
+	os.Remove(DataFile)
+	dataHeapFile, err := NewHeapFile(DataFile, &dataDesc, bp)
+	if err != nil {
+		return nil, err
+	}
+
+	//Create centroid file
+	os.Remove(CentroidFile)
+	centroidHeapFile, err := NewHeapFile(CentroidFile, &centroidDesc, bp)
+	if err != nil {
+		return nil, err
+	}
+
+	//Create mapping file
+	os.Remove(MappingFile)
+	mappingHeapFile, err := NewHeapFile(MappingFile, &mappingDesc, bp)
+	if err != nil {
+		return nil, err
+	}
+	nnif := &NNIndexFile{hfile.fileName, indexedColName, dataHeapFile, centroidHeapFile, mappingHeapFile}
+
+	// clustering.Print()
+	//Insert all centroids and elements into the data file
+	for centroidID, centroid := range clustering.centroidEmbs {
+		centroidTuple := Tuple{centroidDesc, []DBValue{VectorField{*centroid}, IntField{int64(centroidID)}}, nil}
+		err = nnif.centroidHeapFile.insertTuple(&centroidTuple, tid)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	iter, err := hfile.Iterator(tid)
+	if err != nil {
+		return nil, err
+	}
+	for t, err := iter(); t != nil || err != nil; t, err = iter() {
+		if err != nil {
+			return nil, err
+		}
+		err = nnif.insertTuple(t, tid)
+		if err != nil {
+			return nil, err
+		}
+	}
+	bp.CommitTransaction(tid)
+
+	return nnif, nil
 }
