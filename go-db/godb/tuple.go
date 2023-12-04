@@ -20,7 +20,7 @@ const (
 	IntType            DBType = iota
 	StringType         DBType = iota
 	EmbeddedStringType DBType = iota
-	VectorFieldType  DBType = iota
+	VectorFieldType    DBType = iota
 )
 
 var typeNames map[DBType]string = map[DBType]string{IntType: "int", StringType: "string", EmbeddedStringType: "text", VectorFieldType: "vec"}
@@ -165,7 +165,7 @@ type EmbeddedStringField struct {
 
 // String field value
 type VectorField struct {
-	Emb   EmbeddingType
+	Emb EmbeddingType
 }
 
 // Tuple represents the contents of a tuple read from a database
@@ -353,7 +353,7 @@ func (t1 *Tuple) equals(t2 *Tuple) bool {
 			if t1.Fields[i].(EmbeddedStringField).Value != t2.Fields[i].(EmbeddedStringField).Value {
 				return false
 			}
-		
+
 		case VectorFieldType:
 			emb1 := t1.Fields[i].(VectorField).Emb
 			emb2 := t2.Fields[i].(VectorField).Emb
@@ -443,14 +443,14 @@ func (t *Tuple) compareField(t2 *Tuple, field Expr) (orderByState, error) {
 		v2 := e2.(VectorField).Emb
 
 		// Compare using magnitude
-		v1_dist := float64(0);
-		for _, val := range v1{
-			v1_dist += val * val;
+		v1_dist := float64(0)
+		for _, val := range v1 {
+			v1_dist += val * val
 		}
 
-		v2_dist := float64(0);
-		for _, val := range v2{
-			v2_dist += val * val;
+		v2_dist := float64(0)
+		for _, val := range v2 {
+			v2_dist += val * val
 		}
 
 		if v1_dist < v2_dist {
@@ -561,7 +561,9 @@ func (t *Tuple) PrettyPrintString(aligned bool) string {
 		case StringField:
 			str = f.Value
 		case EmbeddedStringField:
-			str = f.Value
+			str = fmt.Sprintf("%v [%v,...]", f.Value, f.Emb[0])
+		case VectorField:
+			str = fmt.Sprintf("[%v,...]", f.Emb[0])
 		}
 		if aligned {
 			outstr = fmt.Sprintf("%s %s", outstr, fmtCol(str, len(t.Fields)))
