@@ -203,7 +203,7 @@ func (c *Clustering) SampleHeapFileClusteringPrint(hf *HeapFile, bp *BufferPool,
 }
 
 func TestKMeansHeapFile(t *testing.T) {
-	hfile, bp, err := GetTestHeapFile("../../data/tweets/tweets_mini.csv", true)
+	hfile, bp, err := GetTestHeapFile("../../data/tweets/tweets_test.csv", true)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
