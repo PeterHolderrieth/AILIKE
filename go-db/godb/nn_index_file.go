@@ -12,6 +12,12 @@ var dataDesc = TupleDesc{Fields: []FieldType{
 // TupleDesc for the heap file that stores the maping from centroids to index pageNos.
 var centroidDesc = TupleDesc{Fields: []FieldType{
 	{Fname: "vector", Ftype: VectorFieldType},
+	{Fname: "centroidId", Ftype: IntType},
+}}
+
+// TupleDesc for the heap file that stores the maping from centroids to index pageNos.
+var mappingDesc = TupleDesc{Fields: []FieldType{
+	{Fname: "centroidId", Ftype: IntType},
 	{Fname: "indexPageNo", Ftype: IntType},
 }}
 
@@ -21,9 +27,11 @@ type NNIndexFile struct {
 	indexedColName string // the name of the column being indexed; must be EmbeddedString column
 	// We use a heapFile to store the vector <-> heapRecordId mappings
 	dataHeapFile *HeapFile
-	// We use another heap file to store centroid <-> pageNo mappings, where pageNo is
-	// the page number of this centroid's page within the data_heap_file
+	// We use another heap file to store centroid <-> centoidId mappings
 	centroidHeapFile *HeapFile
+	// We use a third heap file to store centroidId <-> pageNo, where pageNo is a page that contains 
+	// rows for the given centroid within the dataHeapFile 
+	mappingHeapFile *HeapFile 
 }
 
 // Create a NnIndexFile.
@@ -34,7 +42,7 @@ type NNIndexFile struct {
 // - fromCentroidFile: the backing file for this index that stores the centroid <-> pageNo mapping
 // - bp: the BufferPool that is used to store pages read from this index
 // May return an error if the file cannot be opened or created.
-func NewNNIndexFileFile(tableFileName string, indexedColName string, fromDataFile string, fromCentroidFile string, bp *BufferPool) (*NNIndexFile, error) {
+func NewNNIndexFileFile(tableFileName string, indexedColName string, fromDataFile string, fromCentroidFile string, fromMappingFile string, bp *BufferPool) (*NNIndexFile, error) {
 	dataHeapFile, err := NewHeapFile(fromDataFile, &dataDesc, bp)
 	if err != nil {
 		return nil, err
@@ -43,5 +51,9 @@ func NewNNIndexFileFile(tableFileName string, indexedColName string, fromDataFil
 	if err != nil {
 		return nil, err
 	}
-	return &NNIndexFile{tableFileName, indexedColName, dataHeapFile, centroidHeapFile}, nil
+	mappingHeapFile, err := NewHeapFile(fromMappingFile, &mappingDesc, bp)
+	if err != nil {
+		return nil, err
+	}
+	return &NNIndexFile{tableFileName, indexedColName, dataHeapFile, centroidHeapFile, mappingHeapFile}, nil
 }
