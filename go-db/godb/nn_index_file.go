@@ -114,13 +114,8 @@ func (f *NNIndexFile) getCentroidPageNoIterator(e EmbeddedStringField, ascending
 	}, nil
 }
 
+// Finds a page for the nearest centroid with room for a new record, or creates a new page for that centroid if needed
 func (f *NNIndexFile) insertTuple(t *Tuple, tid TransactionID) error {
-	/*
-		Get the page using find centroid page
-		if the page is full, split the page and insert the tuple
-		if the page is not full, just insert the tuple
-	*/
-
 	if t.Rid.(heapRecordId).fileName != f.tableFileName {
 		return GoDBError{IncompatibleTypesError, "Index does not match table of tuple."}
 	}
@@ -189,7 +184,20 @@ func (f *NNIndexFile) deleteTuple(t *Tuple, tid TransactionID) error {
 	return nil
 }
 
-func ConstructIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nClusters int, DataFile string, CentroidFile string, MappingFile string, bp *BufferPool) (*NNIndexFile, error) {
+// Creates a nearest neighbor index for the given heap file column with nClusters.
+// An NNIndexFile is stored by 3 heap files under the hood: a data file, centroid file, and mapping file.
+//
+// NOTE: currently, constructing an index cannot be run cuncurrently with other transactions
+//
+// Parameters:
+// - hfile: the heap file to create an index for
+// - indexedColName: the column in hfile that the index is for
+// - nClusters: the number of clusters to create
+// - dataFileName: the filename to save the index's dataHeapFile under
+// - centroidFileName: the filename to save the index's centroidHeapFile under
+// - mappingFileName: the filename to save the index's mappingHeapFile under
+// - bp: the buffer pool to use
+func ConstructNNIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nClusters int, dataFileName string, centroidFileName string, mappingFileName string, bp *BufferPool) (*NNIndexFile, error) {
 	tid := NewTID()
 
 	//Create clustering
@@ -201,26 +209,30 @@ func ConstructIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nClu
 	}
 
 	//Create data file
-	os.Remove(DataFile)
-	dataHeapFile, err := NewHeapFile(DataFile, &dataDesc, bp)
+	os.Remove(dataFileName)
+	dataHeapFile, err := NewHeapFile(dataFileName, &dataDesc, bp)
 	if err != nil {
 		return nil, err
 	}
 
 	//Create centroid file
-	os.Remove(CentroidFile)
-	centroidHeapFile, err := NewHeapFile(CentroidFile, &centroidDesc, bp)
+	os.Remove(centroidFileName)
+	centroidHeapFile, err := NewHeapFile(centroidFileName, &centroidDesc, bp)
 	if err != nil {
 		return nil, err
 	}
 
 	//Create mapping file
-	os.Remove(MappingFile)
-	mappingHeapFile, err := NewHeapFile(MappingFile, &mappingDesc, bp)
+	os.Remove(mappingFileName)
+	mappingHeapFile, err := NewHeapFile(mappingFileName, &mappingDesc, bp)
 	if err != nil {
 		return nil, err
 	}
 	nnif := &NNIndexFile{hfile.fileName, indexedColName, dataHeapFile, centroidHeapFile, mappingHeapFile}
+
+	// allow stealing pages from buffer pool
+	// NOTE: cannot create indexes cuncurrently with other transactions
+	bp.steal = true
 
 	// clustering.Print()
 	//Insert all centroids and elements into the data file
@@ -247,5 +259,6 @@ func ConstructIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nClu
 	}
 	bp.CommitTransaction(tid)
 
+	bp.steal = false
 	return nnif, nil
 }
