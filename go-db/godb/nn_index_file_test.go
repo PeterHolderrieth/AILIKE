@@ -7,13 +7,12 @@ import (
 func TestConstructIndex(t *testing.T) {
 	var num_records int = 100 // tweets_test has 100 records in it
 	hfile, bp, err := GetTestHeapFile("../../data/tweets/tweets_test.csv", true)
-	bp.steal = true
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
 	var numClusters int = 10
-	ifile, err := ConstructIndexFileFromHeapFile(hfile, "content", numClusters, "index_data_test.dat", "index_centroids_test.dat", "index_mapping_test.dat", bp)
+	ifile, err := ConstructNNIndexFileFromHeapFile(hfile, "content", numClusters, "index_data_test.dat", "index_centroids_test.dat", "index_mapping_test.dat", bp)
 	if err != nil {
 		t.Fatalf("failed to construct index file, %s", err.Error())
 	}
