@@ -28,7 +28,7 @@ type HeapFile struct {
 	// default to false until the first time page i is read.
 	pageFull *sync.Map
 	// maps column names to indexes that exist for that column; we currently assume at most one index per column
-	indexes map[string]NNIndexFile
+	indexes map[string]*NNIndexFile
 }
 
 // Create a HeapFile.
@@ -44,7 +44,7 @@ func NewHeapFile(fromFile string, td *TupleDesc, bp *BufferPool) (*HeapFile, err
 		return nil, err
 	}
 	var pageFull sync.Map
-	indexes := make(map[string]NNIndexFile) // TODO(tally): populate indexes correctly
+	indexes := make(map[string]*NNIndexFile) // TODO(tally): populate indexes correctly
 	return &HeapFile{fileName: fromFile, desc: *td.copy(), bufPool: bp, filePointer: filePointer, pageFull: &pageFull, indexes: indexes}, nil
 }
 
