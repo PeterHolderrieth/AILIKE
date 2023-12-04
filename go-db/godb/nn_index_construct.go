@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-func ConstructIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nClusters int, DataFile string, CentroidFile string, bp *BufferPool) (*NNIndexFile, error) {
+func ConstructIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nClusters int, DataFile string, CentroidFile string, MappingFile string, bp *BufferPool) (*NNIndexFile, error) {
 
 	//Create clustering
 	getterFunc := GetSimpleGetterFunc(indexedColName)
@@ -15,7 +15,7 @@ func ConstructIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nClu
 		return nil, err
 	}
 
-	//Create data files
+	//Create data file
 	err = os.Remove(DataFile)
 	if err != nil {
 		fmt.Println("Error data file.")
@@ -26,7 +26,7 @@ func ConstructIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nClu
 		return nil, err
 	}
 
-	//Create centroid files
+	//Create centroid file
 	err = os.Remove(CentroidFile)
 	if err != nil {
 		fmt.Println("Error removing centroid file.")
@@ -36,10 +36,21 @@ func ConstructIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nClu
 	if err != nil {
 		return nil, err
 	}
+
+	//Create mapping file
+	err = os.Remove(MappingFile)
+	if err != nil {
+		fmt.Println("Error removing centroid file.")
+		return nil, err
+	}
+	mappingHeapFile, err := NewHeapFile(MappingFile, &mappingDesc, bp)
+	if err != nil {
+		return nil, err
+	}
 	clustering.Print()
 	//Insert all centroids and elements into the data file
 
 	//Insert all centroids and elements into the data file
 
-	return &NNIndexFile{hfile.fileName, indexedColName, dataHeapFile, centroidHeapFile}, nil
+	return &NNIndexFile{hfile.fileName, indexedColName, dataHeapFile, centroidHeapFile, mappingHeapFile}, nil
 }
