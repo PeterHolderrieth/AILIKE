@@ -37,6 +37,10 @@ If using the full embeddings, load the data by running:
 \c ../data/tweets/tweets_768/tweets_768.catalog
 ```
 
+To create an embedding for a table, use (make sure that have loaded the data first!):
+```
+\i tabele col_name num_clusters path_to_file
+```
 
 NOTE: When loading data, you need to make sure the db configurable variables (UseRandomProj and PageSize) match the parameters that were used to generate the .dat files. Furthermore, you need to make sure that the value of RANDOM_PROJ within embedding.py matches that of UseRandomProj. You may need to restart the python server if they do not match.
 
