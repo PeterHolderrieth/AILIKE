@@ -146,7 +146,11 @@ func TestTextParseEasy(t *testing.T) {
 // Test checks if the query planner uses the nn index correctly
 // TODO: fill in this test:
 func TestNNIndexParse(t *testing.T) {
-	var queries []string = []string{}
+	// NOTE: if you have a column in the output that includes text with commas, it needs to be the last column.
+	// This is because LoadFromCsv can only support one text field with commans.
+	var queries []string = []string{
+		"select tweet_id, (content ailike 'hair migration patterns of professors') sim, content from tweets_test order by sim desc limit 2",
+	}
 	_, _, err := MakeTestDatabaseFromCsv("tweets_test", "../../data/tweets/tweets_test.csv", 10)
 	if err != nil {
 		t.Errorf("failed to create test database from file, %s", err.Error())
