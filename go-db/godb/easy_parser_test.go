@@ -97,9 +97,6 @@ func TestParseEasy(t *testing.T) {
 		"select name from (select x.name from (select t.name from t) x)y order by name asc",
 		"select age, count(*) from t group by age",
 	}
-	save := false        //set save to true to save the output of the current test run as the correct answer
-	printOutput := false //print the result set during testing
-
 	bp := NewBufferPool(10)
 	err := MakeTestDatabaseEasy(bp)
 	if err != nil {
@@ -112,152 +109,7 @@ func TestParseEasy(t *testing.T) {
 		t.Errorf("failed load catalog, %s", err.Error())
 		return
 	}
-	qNo := 0
-	for _, sql := range queries {
-		tid := NewTID()
-		bp.BeginTransaction(tid)
-		qNo++
-		if qNo == 4 {
-			continue
-		}
-		qType, plan, err := Parse(c, sql)
-
-		if err != nil {
-			t.Errorf("failed to parse, q=%s, %s", sql, err.Error())
-			return
-		}
-		if plan == nil {
-			t.Errorf("plan was nil")
-			return
-		}
-		if qType != IteratorType {
-			continue
-		}
-
-		var outfile *HeapFile
-		var outfile_csv *os.File
-		var resultSet []*Tuple
-		fname := fmt.Sprintf("savedresults/q%d-easy-result.csv", qNo)
-
-		if save {
-			os.Remove(fname)
-			outfile_csv, err = os.OpenFile(fname, os.O_RDWR|os.O_CREATE, 0644)
-			if err != nil {
-				t.Errorf("failed to open CSV file (%s)", err.Error())
-				return
-			}
-			//outfile, _ = NewHeapFile(fname, plan.Descriptor(), bp)
-		} else {
-			//1. Create empty heap file savedresults/q%d-easy-result.dat
-			//2. Load desired results from savedresults/q%d-easy-result.csv
-			fname_bin := fmt.Sprintf("savedresults/q%d-easy-result.dat", qNo)
-			os.Remove(fname_bin)
-			desc := plan.Descriptor()
-			if desc == nil {
-				t.Errorf("descriptor was nil")
-				return
-			}
-
-			outfile, _ = NewHeapFile(fname_bin, desc, bp)
-			if outfile == nil {
-				t.Errorf("heapfile was nil")
-				return
-			}
-
-			f, err := os.Open(fname)
-			if err != nil {
-				t.Errorf("csv file with results was nil (%s)", err.Error())
-				return
-			}
-			err = outfile.LoadFromCSV(f, true, ",", false)
-			if err != nil {
-				t.Errorf(err.Error())
-				return
-			}
-
-			resultIter, err := outfile.Iterator(tid)
-			if err != nil {
-				t.Errorf("%s", err.Error())
-				return
-			}
-			for {
-				tup, err := resultIter()
-				if err != nil {
-					t.Errorf("%s", err.Error())
-					break
-				}
-
-				if tup != nil {
-					resultSet = append(resultSet, tup)
-				} else {
-					break
-				}
-			}
-		}
-		if printOutput || save {
-			fmt.Printf("Doing %s\n", sql)
-			iter, err := plan.Iterator(tid)
-			if err != nil {
-				t.Errorf("%s", err.Error())
-				return
-			}
-			nresults := 0
-			if save {
-				fmt.Fprintf(outfile_csv, "%s\n", plan.Descriptor().HeaderString(false))
-			}
-			fmt.Printf("%s\n", plan.Descriptor().HeaderString(true))
-			for {
-				tup, err := iter()
-				if err != nil {
-					t.Errorf("%s", err.Error())
-					break
-				}
-				if tup == nil {
-					break
-				} else {
-					fmt.Printf("%s\n", tup.PrettyPrintString(true))
-				}
-				nresults++
-				if save {
-					fmt.Fprintf(outfile_csv, "%s\n", tup.PrettyPrintString(false))
-					//outfile.insertTuple(tup, tid)
-				}
-			}
-			fmt.Printf("(%d results)\n\n", nresults)
-		}
-		if save {
-			//outfile.bufPool.CommitTransaction(tid)
-			outfile_csv.Close()
-		} else {
-
-			iter, err := plan.Iterator(tid)
-			if err != nil {
-				t.Errorf("%s", err.Error())
-				return
-			}
-			match := CheckIfOutputMatches(iter, resultSet)
-			if !match {
-				t.Errorf("query '%s' did not match expected result set", sql)
-				verbose := true
-				if verbose {
-					fmt.Print("Expected: \n")
-					for _, r := range resultSet {
-						fmt.Printf("%s\n", r.PrettyPrintString(true))
-					}
-					fmt.Println("Got: ")
-					_, err := plan.Iterator(tid)
-					if err != nil {
-						t.Errorf("Error creating iterator for plan: %s", err.Error())
-						return
-					}
-					tuple, err := iter()
-					if tuple == nil {
-						fmt.Println("Tuple is nil after calling iterator.")
-					}
-				}
-			}
-		}
-	}
+	_parseTestHelper(t, c, bp, "savedresults/q%d-easy-result", queries)
 }
 
 func TestTextParseEasy(t *testing.T) {
@@ -276,9 +128,6 @@ func TestTextParseEasy(t *testing.T) {
 		"select age, count(*) from t_text group by age",
 		"select name, age, biography from t_text",
 	}
-	save := false        //set save to true to save the output of the current test run as the correct answer
-	printOutput := false //print the result set during testing
-
 	bp := NewBufferPool(10)
 	err := MakeTextTestDatabaseEasy(bp)
 	if err != nil {
@@ -291,15 +140,40 @@ func TestTextParseEasy(t *testing.T) {
 		t.Errorf("failed load catalog, %s", err.Error())
 		return
 	}
+	_parseTestHelper(t, c, bp, "savedresults/text_q%d-result", queries)
+}
 
+// Test checks if the query planner uses the nn index correctly
+// TODO: fill in this test:
+func TestNNIndexParse(t *testing.T) {
+	var queries []string = []string{}
+	_, _, err := MakeTestDatabaseFromCsv("tweets_test", "../../data/tweets/tweets_test.csv", 10)
+	if err != nil {
+		t.Errorf("failed to create test database from file, %s", err.Error())
+		return
+	}
+	_, bp, err := MakeTestDatabaseFromCsv("tweets_test_noindex", "../../data/tweets/tweets_test.csv", 10)
+	if err != nil {
+		t.Errorf("failed to create test database from file, %s", err.Error())
+		return
+	}
+
+	c, err := NewCatalogFromFile("catalog_tweets_test.txt", bp, "./")
+	if err != nil {
+		t.Errorf("failed load catalog, %s", err.Error())
+		return
+	}
+	_parseTestHelper(t, c, bp, "savedresults/nnscan_q%d-result", queries)
+}
+
+func _parseTestHelper(t *testing.T, c *Catalog, bp *BufferPool, resultFileTemplate string, queries []string) {
+	save := true         //set save to true to save the output of the current test run as the correct answer
+	printOutput := false //print the result set during testing
 	qNo := 0
 	for _, sql := range queries {
 		tid := NewTID()
 		bp.BeginTransaction(tid)
 		qNo++
-		if qNo == 4 {
-			continue
-		}
 
 		qType, plan, err := Parse(c, sql)
 		if err != nil {
@@ -318,7 +192,7 @@ func TestTextParseEasy(t *testing.T) {
 		var outfile *HeapFile
 		var outfile_csv *os.File
 		var resultSet []*Tuple
-		fname := fmt.Sprintf("savedresults/q%d-easy-result.csv", qNo)
+		fname := fmt.Sprintf(resultFileTemplate+".csv", qNo)
 
 		if save {
 			os.Remove(fname)
@@ -329,7 +203,7 @@ func TestTextParseEasy(t *testing.T) {
 			}
 			//outfile, _ = NewHeapFile(fname, plan.Descriptor(), bp)
 		} else {
-			fname_bin := fmt.Sprintf("savedresults/q%d-easy-result-text.dat", qNo)
+			fname_bin := fmt.Sprintf(resultFileTemplate+".dat", qNo)
 			os.Remove(fname_bin)
 			desc := plan.Descriptor()
 			if desc == nil {

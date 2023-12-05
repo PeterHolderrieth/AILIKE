@@ -1,0 +1,2 @@
+tweets_test (tweet_id int, sentiment string, content embtext)
+tweets_test_noindex (tweet_id int, sentiment string, content embtext)
