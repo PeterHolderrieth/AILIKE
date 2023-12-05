@@ -3,6 +3,7 @@ package godb
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 )
@@ -164,7 +165,46 @@ func (c *Catalog) GetTable(named string) (DBFile, error) {
 	if t == nil {
 		return nil, GoDBError{NoSuchTableError, fmt.Sprintf("no table '%s' found", named)}
 	}
-	return NewHeapFile(c.tableNameToFile(named), t.desc.copy(), c.bp)
+
+	var iFilenames = make(map[string]map[string]string);
+	files, err := ioutil.ReadDir(c.rootPath)
+	if err == nil {
+		for _, f := range files {
+			split_name := strings.Split(f.Name(), ".")
+			if (len(split_name) != 4){
+				continue;
+			}
+			if (split_name[0] != named){
+				continue;
+			}
+			if _, found := iFilenames[split_name[1]]; !found {
+				iFilenames[split_name[1]] = make(map[string]string)
+			} 
+			
+			iFilenames[split_name[1]][split_name[2]] = f.Name()
+		}
+	}
+
+	var NNindexes = make(map[string]*NNIndexFile);
+	for key, val := range iFilenames{
+		if _, found := val["data"]; !found {
+			break
+		}  
+		if _, found := val["mapping"]; !found {
+			break
+		}  
+		if _, found := val["centroids"]; !found {
+			break
+		}  
+		index, err := NewNNIndexFileFile(named, key, val["data"], val["centroids"],
+			 val["mapping"], c.bp)
+		if err != nil{
+			break;
+		}
+		NNindexes[key] = index;
+	}
+
+	return NewHeapFileIndex(c.tableNameToFile(named), t.desc.copy(), c.bp, NNindexes)
 
 }
 

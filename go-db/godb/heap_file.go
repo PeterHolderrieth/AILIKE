@@ -48,6 +48,16 @@ func NewHeapFile(fromFile string, td *TupleDesc, bp *BufferPool) (*HeapFile, err
 	return &HeapFile{fileName: fromFile, desc: *td.copy(), bufPool: bp, filePointer: filePointer, pageFull: &pageFull, indexes: indexes}, nil
 }
 
+func NewHeapFileIndex(fromFile string, td *TupleDesc, bp *BufferPool, indexes map[string]*NNIndexFile) (*HeapFile, error) {
+
+	filePointer, err := os.OpenFile(fromFile, os.O_CREATE|os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	var pageFull sync.Map
+	return &HeapFile{fileName: fromFile, desc: *td.copy(), bufPool: bp, filePointer: filePointer, pageFull: &pageFull, indexes: indexes}, nil
+}
+
 // Return the number of bytes in file
 func (f *HeapFile) FileByteSize() int {
 
