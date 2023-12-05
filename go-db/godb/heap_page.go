@@ -99,6 +99,18 @@ func (h *heapPage) insertTuple(t *Tuple) (recordID, error) {
 	return nil, GoDBError{PageFullError, "No empty slots in heap page; page is malformed."}
 }
 
+// Returns the tuple with the specified rid, or return an error if tuple not found
+func (h *heapPage) findTuple(rid recordID) (*Tuple, error) {
+	if rid.(heapRecordId).pageNo != h.pageNo {
+		panic("Trying to find record from wrong page.")
+	}
+	slotNo := rid.(heapRecordId).slotNo
+	if h.records[slotNo] != nil {
+		return h.records[slotNo], nil
+	}
+	return nil, GoDBError{IllegalOperationError, "Trying to find a non-existant tuple."}
+}
+
 // Delete the tuple in the specified slot number, or return an error if
 // the slot is invalid
 func (h *heapPage) deleteTuple(rid recordID) error {
