@@ -29,7 +29,8 @@ Available shell commands:
 	\d : List tables and fields in the current database
 	\f : List available functions for use in queries
 	\a : Toggle aligned vs csv output
-	\l table path/to/file [sep] [hasHeader]: Append csv file to end of table.  Default to sep = ',', hasHeader = 'true'`
+	\l : table path/to/file [sep] [hasHeader]: Append csv file to end of table.  Default to sep = ',', hasHeader = 'true'
+	\i : table column_name num_clusters path/to/file`
 
 /*func printCatalog(fname string) {
 	f, err := os.Open(fname)
@@ -123,8 +124,6 @@ func main() {
 	aligned := true
 	for {
 
-		//text := "SELECT l_orderkey, sum(l_extendedprice * (1 - l_discount)) as revenue, o_orderdate, o_shippriority FROM customer, orders, lineitem WHERE c_mktsegment = 'BUILDING' AND c_custkey = o_custkey AND l_orderkey = o_orderkey GROUP BY l_orderkey, o_orderdate, o_shippriority ORDER BY revenue desc, o_orderdate LIMIT 20"
-		//text := "select count(*) from lineitem where l_orderkey = 1;"
 		f, err := os.Create("prog.prof")
 		if err != nil {
 			log.Fatal(err)
@@ -211,6 +210,33 @@ func main() {
 					continue
 				}
 				fmt.Printf("\033[32;1mLOAD\033[0m\n\n")
+			case 'i':
+				splits := strings.Split(text, " ")
+				if (len(splits) != 5){
+					fmt.Println("Usage is i table_name col_name num_clusters path_to_table")
+					break;
+				}
+				table := splits[1]
+				col := splits[2]
+				clusters, err := strconv.Atoi(splits[3])
+				if err != nil{
+					fmt.Println("Please use an integer as the number of clusters")
+					break;
+				}
+				path := splits[4]
+				hf, err := c.GetTable(table)
+				if err != nil{
+					fmt.Println("Please load the table first before trying to construct the index")
+				}
+
+				_, err = godb.ConstructNNIndexFileFromHeapFile(hf.(*godb.HeapFile), col, clusters, 
+					path + "/" + table + "." + col + ".data.dat", 
+					path + "/" + table + "." + col + ".centroids.dat",
+					path + "/"  + table + "." + col + ".mapping.dat", bp)
+
+				if err != nil {
+					fmt.Println("failed to construct index file, %s", err.Error())
+				}
 			}
 
 			query = ""
