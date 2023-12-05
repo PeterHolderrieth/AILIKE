@@ -559,9 +559,10 @@ func (t *Tuple) PrettyPrintString(aligned bool) string {
 		case IntField:
 			str = fmt.Sprintf("%d", f.Value)
 		case StringField:
+			// The easy_parser_test depends on this formatting; don't change it
 			str = f.Value
 		case EmbeddedStringField:
-			str = fmt.Sprintf("%v [%v,...]", f.Value, f.Emb[0])
+			str = f.Value
 		case VectorField:
 			str = fmt.Sprintf("[%v,...]", f.Emb[0])
 		}
