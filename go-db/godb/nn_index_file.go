@@ -184,6 +184,21 @@ func (f *NNIndexFile) deleteTuple(t *Tuple, tid TransactionID) error {
 	return nil
 }
 
+// Returns a getter function that takes a tuple, and returns just the embedding for the
+// EmbeddedStringField specified by columnName.
+func GetEmbeddingGetterFunc(columnName string) func(t *Tuple) (*EmbeddingType, error) {
+	ftype := FieldType{Fname: columnName}
+	return func(t *Tuple) (*EmbeddingType, error) {
+		idx, err := findFieldInTd(ftype, &t.Desc)
+		if err != nil {
+			return nil, err
+		}
+		field := t.Fields[idx]
+		embField := field.(EmbeddedStringField)
+		return &embField.Emb, nil
+	}
+}
+
 // Creates a nearest neighbor index for the given heap file column with nClusters.
 // An NNIndexFile is stored by 3 heap files under the hood: a data file, centroid file, and mapping file.
 //
@@ -201,7 +216,7 @@ func ConstructNNIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nC
 	tid := NewTID()
 
 	//Create clustering
-	getterFunc := GetSimpleGetterFunc(indexedColName)
+	getterFunc := GetEmbeddingGetterFunc(indexedColName)
 	clustering, err := KMeansClustering(hfile, nClusters, TextEmbeddingDim,
 		MaxIterKMeans, DeltaThrKMeans, getterFunc, false)
 	if err != nil {

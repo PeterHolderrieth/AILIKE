@@ -177,6 +177,15 @@ func (f *HeapFile) readPage(pageNo int) (*Page, error) {
 	return &p, nil
 }
 
+func (f *HeapFile) getHeapPage(pageNo int, tid TransactionID, perm RWPerm) (*heapPage, error) {
+	p, err := f.bufPool.GetPage(f, pageNo, tid, perm)
+	if err != nil {
+		return nil, err
+	}
+	hp := (*p).(*heapPage)
+	return hp, nil
+}
+
 // GetPageForInsert finds a page with an available slot for inserting
 // If all pages are full, returns nil pointer.
 func (f *HeapFile) getPageForInsert(tid TransactionID) (*heapPage, error) {
@@ -187,9 +196,8 @@ func (f *HeapFile) getPageForInsert(tid TransactionID) (*heapPage, error) {
 				continue
 			}
 			if f.bufPool.hasPageCached(f, pageNo, tid, WritePerm) {
-				p, err := f.bufPool.GetPage(f, pageNo, tid, WritePerm)
+				hp, err := f.getHeapPage(pageNo, tid, WritePerm)
 				if err == nil {
-					hp := (*p).(*heapPage)
 					if hp.numOpenSlots > 0 {
 						return hp, nil
 					}
@@ -202,9 +210,8 @@ func (f *HeapFile) getPageForInsert(tid TransactionID) (*heapPage, error) {
 			if isFull, loaded := f.pageFull.Load(pageNo); loaded && isFull.(bool) {
 				continue
 			}
-			p, err := f.bufPool.GetPage(f, pageNo, tid, WritePerm)
+			hp, err := f.getHeapPage(pageNo, tid, WritePerm)
 			if err == nil {
-				hp := (*p).(*heapPage)
 				if hp.numOpenSlots > 0 {
 					return hp, nil
 				}
@@ -214,9 +221,8 @@ func (f *HeapFile) getPageForInsert(tid TransactionID) (*heapPage, error) {
 		newPageNo := f.NumPages()
 		// It is possible a different thread has already created this page, so we try to get it.
 		// This also gets an exclusive lock on the new page number, preventing another transaction from creating the page.
-		p, err := f.bufPool.GetPage(f, newPageNo, tid, WritePerm)
+		hp, err := f.getHeapPage(newPageNo, tid, WritePerm)
 		if err == nil {
-			hp := (*p).(*heapPage)
 			if hp.numOpenSlots > 0 {
 				return hp, nil
 			}
@@ -229,11 +235,10 @@ func (f *HeapFile) getPageForInsert(tid TransactionID) (*heapPage, error) {
 				return nil, err
 			}
 			// get new page from bufPool
-			p, err = f.bufPool.GetPage(f, newPageNo, tid, WritePerm)
+			hp, err := f.getHeapPage(newPageNo, tid, WritePerm)
 			if err != nil {
 				return nil, err
 			}
-			hp := (*p).(*heapPage)
 			return hp, nil
 		}
 	}
@@ -295,11 +300,10 @@ func (f *HeapFile) insertTuple(t *Tuple, tid TransactionID) error {
 // returns an error.
 func (f *HeapFile) insertTupleIntoPage(t *Tuple, pageNo int, tid TransactionID) error {
 
-	p, err := f.bufPool.GetPage(f, pageNo, tid, WritePerm)
+	hp, err := f.getHeapPage(pageNo, tid, WritePerm)
 	if err != nil {
 		return err
 	}
-	hp := (*p).(*heapPage)
 	if hp.numOpenSlots <= 0 {
 		return GoDBError{PageFullError, "Cannot insert into full page."}
 	}
@@ -318,7 +322,7 @@ func (f *HeapFile) insertTupleIntoNewPage(t *Tuple, tid TransactionID) (int, err
 		// This also gets an exclusive lock on the new page number, preventing another transaction from creating the page.
 		// If this does not fail; that means another transaction already created the page, so we need
 		// to try and create another one.
-		_, err := f.bufPool.GetPage(f, newPageNo, tid, WritePerm)
+		_, err := f.getHeapPage(newPageNo, tid, WritePerm)
 		if err == nil {
 			continue
 		} else {
@@ -329,11 +333,10 @@ func (f *HeapFile) insertTupleIntoNewPage(t *Tuple, tid TransactionID) (int, err
 				return -1, err
 			}
 			// get new page from bufPool
-			p, err := f.bufPool.GetPage(f, newPageNo, tid, WritePerm)
+			np, err = f.getHeapPage(newPageNo, tid, WritePerm)
 			if err != nil {
 				return -1, err
 			}
-			np = (*p).(*heapPage)
 		}
 	}
 
@@ -345,6 +348,18 @@ func (f *HeapFile) insertTupleIntoNewPage(t *Tuple, tid TransactionID) (int, err
 		return -1, err
 	}
 	return newPageNo, nil
+}
+
+// Finds the tuple with the given rid and returns it.
+func (f *HeapFile) findTuple(rid heapRecordId, tid TransactionID) (*Tuple, error) {
+	if rid.fileName != f.fileName {
+		return nil, GoDBError{TupleNotFoundError, "Tuple does not exist within this file."}
+	}
+	hp, err := f.getHeapPage(rid.pageNo, tid, WritePerm)
+	if err != nil {
+		return nil, err
+	}
+	return hp.findTuple(rid)
 }
 
 // Remove the provided tuple from the HeapFile.  This method should use the
@@ -359,12 +374,10 @@ func (f *HeapFile) deleteTuple(t *Tuple, tid TransactionID) error {
 	if rid.fileName != f.fileName {
 		return GoDBError{TupleNotFoundError, "Tuple does not exist within this file."}
 	}
-	p, err := f.bufPool.GetPage(f, rid.pageNo, tid, WritePerm)
+	hp, err := f.getHeapPage(rid.pageNo, tid, WritePerm)
 	if err != nil {
 		return err
 	}
-
-	hp := (*p).(*heapPage)
 	err = hp.deleteTuple(rid)
 	if err != nil {
 		return err
@@ -420,8 +433,6 @@ func (f *HeapFile) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
 		return nil, nil
 	}
 	return func() (*Tuple, error) {
-		//fmt.Println("Calling heapFile iterator on: ", f.fileName)
-		//fmt.Println("Number of pages: ", f.NumPages())
 		var t *Tuple
 		t, err := tupleIter()
 		if err != nil {
@@ -429,13 +440,12 @@ func (f *HeapFile) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
 		}
 		for t == nil && pageNo < f.NumPages() {
 			// Try to get the tuple iter for the next page and return that tuple
-			nextPage, err := f.bufPool.GetPage(f, pageNo, tid, ReadPerm)
+			hp, err := f.getHeapPage(pageNo, tid, ReadPerm)
 			pageNo += 1
 			if err != nil {
 				fmt.Println("Getting error when getting page.")
 				return nil, err
 			}
-			hp := (*nextPage).(*heapPage) // don't like doing this
 			tupleIter = hp.tupleIter()
 			t, err = tupleIter()
 			if err != nil {
