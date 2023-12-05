@@ -2,27 +2,102 @@ package godb
 
 import "fmt"
 
-func vectorIndexExists(field FieldType, c *Catalog) bool {
-	// TODO: check if a vector index for a given table/column exist
-	return true
+func nnIndexExists(field FieldType, c *Catalog) (bool, error) {
+	tableName := field.TableQualifier
+	if t, ok := c.tableMap[tableName]; ok && t != nil {
+		dbFile, err := c.GetTable(tableName)
+		if err != nil {
+			return false, GoDBError{NoSuchTableError, fmt.Sprintf("no table '%s' found", tableName)}
+		}
+		hf, ok := dbFile.(*HeapFile)
+		if !ok {
+			return false, GoDBError{NoSuchTableError, fmt.Sprintf("Issue reading table '%s'", tableName)}
+		}
+		if index := getIndexForField(field, hf); index != nil {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func getIndexForField(field FieldType, hf *HeapFile) *NNIndexFile {
+	colName := field.Fname
+	if index, ok := hf.indexes[colName]; ok && index != nil {
+		return index
+	}
+	return nil
 }
 
 type NNScan struct {
-	indexField  FieldType
-	queryVector ConstExpr
-	heapFile    HeapFile // tempory hack to continue doing heap scans until vector index implemented
-	limitTups   Expr     // number of tuples to limit to
-	ascending   bool     // whether to order by most or least similar
+	indexField     FieldType
+	queryEmbedding EmbeddedStringField
+	heapFile       *HeapFile // tempory hack to continue doing heap scans until vector index implemented
+	nnIndexFile    *NNIndexFile
+	limitNo        int  // number of tuples to limit to
+	ascending      bool // whether to order by most or least similar
 }
 
 // Create an
-func NewNNScan(heapFile HeapFile, limit Expr, indexField FieldType, queryVector ConstExpr, ascending bool) (*NNScan, error) {
-	// TODO: add validation on inputs
-	return &NNScan{indexField, queryVector, heapFile, limit, ascending}, nil
+func NewNNScan(heapFile *HeapFile, limit Expr, indexField FieldType, queryExpr ConstExpr, ascending bool) (*NNScan, error) {
+	index := getIndexForField(indexField, heapFile)
+	if index == nil {
+		return nil, GoDBError{NoSuchTableError, fmt.Sprintf("No index found for field '%s'", indexField.Fname)}
+	}
+
+	if queryExpr.constType != EmbeddedStringType {
+		return nil, GoDBError{IncompatibleTypesError, "Query expression must be an embedded string"}
+	}
+	queryEmbedding := queryExpr.val.(EmbeddedStringField)
+
+	limitVal, err := limit.EvalExpr(nil)
+	if err != nil {
+		panic("Cannot evaluate limit within NNScan.")
+	}
+	limitNo := int(limitVal.(IntField).Value)
+
+	return &NNScan{indexField, queryEmbedding, heapFile, index, limitNo, ascending}, nil
 }
 
 func (v *NNScan) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
-	return v.heapFile.Iterator(tid)
+	// TODO: use smarter strategy for suggesting the number of centroids to vist; this is too many.
+	centroidPageIter, err := v.nnIndexFile.getCentroidPageNoIterator(v.queryEmbedding, v.ascending, tid, v.limitNo)
+	if err != nil {
+		return nil, err
+	}
+	var indexTupleIter func() (*Tuple, error) = func() (*Tuple, error) {
+		return nil, nil
+	}
+	var hrid heapRecordId
+	return func() (*Tuple, error) {
+		var t *Tuple
+		t, err := indexTupleIter()
+		if err != nil {
+			return nil, err
+		}
+		for centroidPageNoPair, err := centroidPageIter(); t == nil && (err != nil || centroidPageNoPair[1] != -1); centroidPageNoPair, err = centroidPageIter() {
+			if err != nil {
+				return nil, err
+			}
+			nextPageNo := centroidPageNoPair[1]
+			nextIndexPage, err := v.nnIndexFile.dataHeapFile.getHeapPage(nextPageNo, tid, ReadPerm)
+			if err != nil {
+				return nil, err
+			}
+			indexTupleIter = nextIndexPage.tupleIter()
+			t, err = indexTupleIter()
+			if err != nil {
+				return nil, err
+			}
+
+		}
+		hrid = heapRecordId{v.heapFile.fileName, int(t.Fields[0].(IntField).Value), int(t.Fields[1].(IntField).Value)}
+		nt, err := v.heapFile.findTuple(hrid, tid)
+		if err != nil {
+			return nil, err
+		}
+		return nt, nil
+
+	}, nil
 }
 
 func (v *NNScan) Descriptor() *TupleDesc {
@@ -30,15 +105,10 @@ func (v *NNScan) Descriptor() *TupleDesc {
 }
 
 func (v *NNScan) PrettyPrint() string {
-	limitVal, err := v.limitTups.EvalExpr(nil) // using nil since limitTups is a ConstExpr that does not depend on tuple
-	if err != nil {
-		panic("Cannot evaluate limit within NNScan PrettyPrint.")
-	}
-	limit := limitVal.(IntField).Value
-	query := v.queryVector.val.(EmbeddedStringField).Value
+	query := v.queryEmbedding.Value
 	var orderString string = "descending"
 	if v.ascending {
 		orderString = "ascending"
 	}
-	return fmt.Sprintf("{column: %v, table: %v, limit: %v, %v, query: %v}", v.indexField.Fname, v.indexField.TableQualifier, limit, orderString, query)
+	return fmt.Sprintf("{column: %v, table: %v, limit: %v, %v, query: %v}", v.indexField.Fname, v.indexField.TableQualifier, v.limitNo, orderString, query)
 }

@@ -967,8 +967,11 @@ func _getArgsFromAilikeFunc(expr Expr, c *Catalog) (indexField *FieldExpr, query
 		if constExpr.constType != EmbeddedStringType || fieldExpr.selectField.Ftype != EmbeddedStringType {
 			return nil, nil, GoDBError{ParseError, "Attempting to plan AILIKE operation with non-EmbededStringType."}
 		}
-		// TODO: we will need to check if the field has an index
-		if vectorIndexExists(fieldExpr.selectField, c) {
+		exists, err := nnIndexExists(fieldExpr.selectField, c)
+		if err != nil {
+			return nil, nil, err
+		}
+		if exists {
 			indexField = fieldExpr
 			queryVector = constExpr
 		}
@@ -1247,7 +1250,7 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 			if err != nil {
 				return nil, GoDBError{ParseError, "Could not determine limit for vector index."}
 			}
-			vectorIndex, err := NewNNScan(*heapFile, limitExpr, (*indexField).selectField, *queryVector, ascending)
+			vectorIndex, err := NewNNScan(heapFile, limitExpr, (*indexField).selectField, *queryVector, ascending)
 			if err != nil {
 				return nil, GoDBError{ParseError, "Could not create NNScan"}
 			}
@@ -1306,7 +1309,7 @@ func makePhysicalPlan(c *Catalog, plan *LogicalPlan) (Operator, error) {
 			if err != nil {
 				return nil, GoDBError{ParseError, "Could not determine limit for vector index."}
 			}
-			vectorIndex, err := NewNNScan(*heapFile, limitExpr, (*indexField).selectField, *queryVector, ascending)
+			vectorIndex, err := NewNNScan(heapFile, limitExpr, (*indexField).selectField, *queryVector, ascending)
 			if err != nil {
 				return nil, GoDBError{ParseError, "Could not create NNScan"}
 			}
