@@ -167,7 +167,7 @@ func TestNNIndexParse(t *testing.T) {
 }
 
 func _parseTestHelper(t *testing.T, c *Catalog, bp *BufferPool, resultFileTemplate string, queries []string) {
-	save := true         //set save to true to save the output of the current test run as the correct answer
+	save := false        //set save to true to save the output of the current test run as the correct answer
 	printOutput := false //print the result set during testing
 	qNo := 0
 	for _, sql := range queries {
