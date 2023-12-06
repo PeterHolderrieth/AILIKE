@@ -158,50 +158,59 @@ func (c *Catalog) addTable(named string, desc TupleDesc) error {
 
 func (c *Catalog) tableNameToFile(tableName string) string {
 	return c.rootPath + "/" + tableName + ".dat"
-
 }
+
 func (c *Catalog) GetTable(named string) (DBFile, error) {
 	t := c.tableMap[named]
 	if t == nil {
 		return nil, GoDBError{NoSuchTableError, fmt.Sprintf("no table '%s' found", named)}
 	}
 
-	var iFilenames = make(map[string]map[string]string);
+	var iFilenames = make(map[string]map[string]string)
 	files, err := ioutil.ReadDir(c.rootPath)
 	if err == nil {
 		for _, f := range files {
 			split_name := strings.Split(f.Name(), ".")
-			if (len(split_name) != 4){
-				continue;
+			if len(split_name) != 2 {
+				continue
 			}
-			if (split_name[0] != named){
-				continue;
+			split_name = strings.Split(split_name[0], "__")
+			if len(split_name) != 4 {
+				continue
 			}
-			if _, found := iFilenames[split_name[1]]; !found {
-				iFilenames[split_name[1]] = make(map[string]string)
-			} 
-			
-			iFilenames[split_name[1]][split_name[2]] = f.Name()
+			if split_name[0] != "index" {
+				continue
+			}
+			if split_name[1] != named {
+				continue
+			}
+			col := split_name[2]
+			fileType := split_name[3]
+			if _, found := iFilenames[col]; !found {
+				iFilenames[col] = make(map[string]string)
+			}
+
+			iFilenames[col][fileType] = c.rootPath + "/" + f.Name()
 		}
 	}
 
-	var NNindexes = make(map[string]*NNIndexFile);
-	for key, val := range iFilenames{
+	var NNindexes = make(map[string]*NNIndexFile)
+	for key, val := range iFilenames {
 		if _, found := val["data"]; !found {
-			break
-		}  
-		if _, found := val["mapping"]; !found {
-			break
-		}  
-		if _, found := val["centroids"]; !found {
-			break
-		}  
-		index, err := NewNNIndexFileFile(named, key, val["data"], val["centroids"],
-			 val["mapping"], c.bp)
-		if err != nil{
-			break;
+			continue
 		}
-		NNindexes[key] = index;
+		if _, found := val["mapping"]; !found {
+			continue
+		}
+		if _, found := val["centroids"]; !found {
+			continue
+		}
+		index, err := NewNNIndexFileFile(named, key, val["data"], val["centroids"],
+			val["mapping"], c.bp)
+		if err != nil {
+			break
+		}
+		NNindexes[key] = index
 	}
 
 	return NewHeapFileIndex(c.tableNameToFile(named), t.desc.copy(), c.bp, NNindexes)
