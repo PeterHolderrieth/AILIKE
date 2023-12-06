@@ -212,27 +212,27 @@ func main() {
 				fmt.Printf("\033[32;1mLOAD\033[0m\n\n")
 			case 'i':
 				splits := strings.Split(text, " ")
-				if (len(splits) != 5){
+				if len(splits) != 5 {
 					fmt.Println("Usage is i table_name col_name num_clusters path_to_table")
-					break;
+					break
 				}
 				table := splits[1]
 				col := splits[2]
 				clusters, err := strconv.Atoi(splits[3])
-				if err != nil{
+				if err != nil {
 					fmt.Println("Please use an integer as the number of clusters")
-					break;
+					break
 				}
 				path := splits[4]
 				hf, err := c.GetTable(table)
-				if err != nil{
+				if err != nil {
 					fmt.Println("Please load the table first before trying to construct the index")
 				}
 
-				_, err = godb.ConstructNNIndexFileFromHeapFile(hf.(*godb.HeapFile), col, clusters, 
-					path + "/" + table + "." + col + ".data.dat", 
-					path + "/" + table + "." + col + ".centroids.dat",
-					path + "/"  + table + "." + col + ".mapping.dat", bp)
+				_, err = godb.ConstructNNIndexFileFromHeapFile(hf.(*godb.HeapFile), col, clusters,
+					path+"/index__"+table+"__"+col+"__data.dat",
+					path+"/index__"+table+"__"+col+"__centroids.dat",
+					path+"/index__"+table+"__"+col+"__mapping.dat", bp)
 
 				if err != nil {
 					fmt.Println("failed to construct index file, %s", err.Error())

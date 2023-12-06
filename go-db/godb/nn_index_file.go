@@ -80,7 +80,7 @@ func (f *NNIndexFile) getCentroidPageNoIterator(e EmbeddedStringField, ascending
 		return nil, err
 	}
 	var distFieldExpr Expr = &FieldExpr{FieldType{Fname: "dist", Ftype: IntType}}
-	orderby, err := NewOrderBy([]Expr{distFieldExpr}, proj, []bool{true})
+	orderby, err := NewOrderBy([]Expr{distFieldExpr}, proj, []bool{ascending})
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (f *NNIndexFile) getCentroidPageNoIterator(e EmbeddedStringField, ascending
 			return [2]int{-1, -1}, err
 		}
 		if row != nil {
-			centoidId = int(row.Fields[0].(IntField).Value)
+			centoidId = int(row.Fields[2].(IntField).Value)
 			pageNo = int(row.Fields[3].(IntField).Value)
 			return [2]int{centoidId, pageNo}, nil
 		}
@@ -254,6 +254,16 @@ func ConstructNNIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nC
 	for centroidID, centroid := range clustering.centroidEmbs {
 		centroidTuple := Tuple{centroidDesc, []DBValue{VectorField{*centroid}, IntField{int64(centroidID)}}, nil}
 		err = nnif.centroidHeapFile.insertTuple(&centroidTuple, tid)
+		if err != nil {
+			return nil, err
+		}
+		_, newPageNo, err := nnif.dataHeapFile.makeNewPage(tid)
+		if err != nil {
+			return nil, err
+		}
+		// We initialize the index with at least one page per centroid
+		mappingTuple := Tuple{mappingDesc, []DBValue{IntField{int64(centroidID)}, IntField{int64(newPageNo)}}, nil}
+		err = nnif.mappingHeapFile.insertTuple(&mappingTuple, tid)
 		if err != nil {
 			return nil, err
 		}
