@@ -138,6 +138,20 @@ func (desc *TupleDesc) sizeInBytes() int {
 	return StringLength*numStrings + IntSizeBytes*numInts + numTexts*TextSizeBytes + numVec*EmbeddingSizeBytes
 }
 
+// Compute number of tuples that fit into a page given the descriptor
+func (desc *TupleDesc) getNTuplesPerPage(pagesize int) (int32, error) {
+
+	remPageSize := pagesize - 8 // bytes after header
+
+	bytes_per_tuple := desc.sizeInBytes()
+
+	if bytes_per_tuple == 0 {
+		return -1, GoDBError{MalformedDataError,
+			fmt.Sprintf("Tuple descriptor is empty. Number of tuples on page is undefined.")}
+	}
+	return int32(remPageSize / bytes_per_tuple), nil //integer division will round down
+}
+
 // ================== Tuple Methods ======================
 
 // Interface used for tuple field values

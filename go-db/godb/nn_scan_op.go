@@ -2,6 +2,8 @@ package godb
 
 import "fmt"
 
+// Function to be queried in parser to check whether a given heap file
+// has an index for a specific column
 func nnIndexExists(field FieldType, c *Catalog) (bool, error) {
 	tableName := field.TableQualifier
 	if t, ok := c.tableMap[tableName]; ok && t != nil {
@@ -20,6 +22,7 @@ func nnIndexExists(field FieldType, c *Catalog) (bool, error) {
 	return false, nil
 }
 
+// Get index for field
 func getIndexForField(field FieldType, hf *HeapFile) *NNIndexFile {
 	colName := field.Fname
 	if index, ok := hf.indexes[colName]; ok && index != nil {
@@ -58,9 +61,18 @@ func NewNNScan(heapFile *HeapFile, limit Expr, indexField FieldType, queryExpr C
 	return &NNScan{indexField, queryEmbedding, heapFile, index, limitNo, ascending}, nil
 }
 
+func (v *NNScan) GetNumberOfProbes() int {
+	nCentroids := v.nnIndexFile.NCentroids()
+	nTuples := v.nnIndexFile.NTuples()
+	avgClusterSize := nTuples / nCentroids
+	return v.limitNo/avgClusterSize + DefaultProbe
+}
+
 func (v *NNScan) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
-	// TODO: use smarter strategy for suggesting the number of centroids to vist; this is too many.
-	centroidPageIter, err := v.nnIndexFile.getCentroidPageNoIterator(v.queryEmbedding, v.ascending, tid, v.limitNo)
+
+	nProbes := v.GetNumberOfProbes()
+
+	centroidPageIter, err := v.nnIndexFile.getCentroidPageNoIterator(v.queryEmbedding, v.ascending, tid, nProbes)
 	if err != nil {
 		return nil, err
 	}
