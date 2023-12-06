@@ -38,6 +38,14 @@ type NNIndexFile struct {
 	mappingHeapFile *HeapFile
 }
 
+func (f *NNIndexFile) NCentroids() int {
+	return f.centroidHeapFile.NTuples()
+}
+
+func (f *NNIndexFile) NTuples() int {
+	return f.dataHeapFile.NTuples()
+}
+
 // Create a NnIndexFile.
 // Parameters
 // - fromTableFile: the filename for the HeapFile for the Table that this NN index is for.
