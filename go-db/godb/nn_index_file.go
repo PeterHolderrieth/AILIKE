@@ -31,11 +31,19 @@ type NNIndexFile struct {
 	indexedColName string // the name of the column being indexed; must be EmbeddedString column
 	// We use a heapFile to store the vector <-> heapRecordId mappings
 	dataHeapFile *HeapFile
-	// We use another heap file to store centroid <-> centoidId mappings
+	// We use another heap file to store centroid <-> centroidID mappings
 	centroidHeapFile *HeapFile
 	// We use a third heap file to store centroidId <-> pageNo, where pageNo is a page that contains
 	// rows for the given centroid within the dataHeapFile
 	mappingHeapFile *HeapFile
+}
+
+func (f *NNIndexFile) NCentroids() int {
+	return f.centroidHeapFile.NTuples()
+}
+
+func (f *NNIndexFile) NTuples() int {
+	return f.dataHeapFile.NTuples()
 }
 
 // Create a NnIndexFile.
@@ -70,25 +78,33 @@ func NewNNIndexFileFile(tableFileName string, indexedColName string, fromDataFil
 // - tid: the transaction id
 // - p (optional): the number of centroids to visit; if p is negative, visit all centroids
 func (f *NNIndexFile) getCentroidPageNoIterator(e EmbeddedStringField, ascending bool, tid TransactionID, p int) (func() ([2]int, error), error) {
+
 	var centroidIdFieldExpr Expr = &FieldExpr{FieldType{Fname: "centroidId", Ftype: IntType}}
 	var fe Expr = &FieldExpr{FieldType{Fname: "vector", Ftype: VectorFieldType}}
 	var ce Expr = &ConstExpr{e, EmbeddedStringType}
+
 	// TODO: support multiple distance metrics
 	var ailikeExpr Expr = &FuncExpr{"ailike_vec", []*Expr{&fe, &ce}}
+
+	// Project centroid heap file elements to [centroidID, AILIKE(e,vector) AS "dist"]
 	proj, err := NewProjectOp([]Expr{centroidIdFieldExpr, ailikeExpr}, []string{"centroidId", "dist"}, false, f.centroidHeapFile)
 	if err != nil {
 		return nil, err
 	}
+	// Order by distance
 	var distFieldExpr Expr = &FieldExpr{FieldType{Fname: "dist", Ftype: IntType}}
 	orderby, err := NewOrderBy([]Expr{distFieldExpr}, proj, []bool{ascending})
 	if err != nil {
 		return nil, err
 	}
-	var topOp Operator = orderby
+	// Limit to p centroids if wanted
+	var limitOrderBy Operator = orderby
 	if p > 0 {
-		topOp = NewLimitOp(&ConstExpr{IntField{int64(p)}, IntType}, orderby)
+		limitOrderBy = NewLimitOp(&ConstExpr{IntField{int64(p)}, IntType}, orderby)
 	}
-	join, err := NewIntJoin(topOp, centroidIdFieldExpr, f.mappingHeapFile, centroidIdFieldExpr, 10)
+
+	// Join with mapping file
+	join, err := NewIntJoin(limitOrderBy, centroidIdFieldExpr, f.mappingHeapFile, centroidIdFieldExpr, 10)
 	if err != nil {
 		return nil, err
 	}
@@ -98,17 +114,18 @@ func (f *NNIndexFile) getCentroidPageNoIterator(e EmbeddedStringField, ascending
 		return nil, err
 	}
 
-	var centoidId int
+	var centroidID int
 	var pageNo int
+
 	return func() ([2]int, error) {
 		row, err := joinIter()
 		if err != nil {
 			return [2]int{-1, -1}, err
 		}
 		if row != nil {
-			centoidId = int(row.Fields[2].(IntField).Value)
+			centroidID = int(row.Fields[2].(IntField).Value)
 			pageNo = int(row.Fields[3].(IntField).Value)
-			return [2]int{centoidId, pageNo}, nil
+			return [2]int{centroidID, pageNo}, nil
 		}
 		return [2]int{-1, -1}, nil
 	}, nil
@@ -119,18 +136,13 @@ func (f *NNIndexFile) insertTuple(t *Tuple, tid TransactionID) error {
 	if t.Rid.(heapRecordId).fileName != f.tableFileName {
 		return GoDBError{IncompatibleTypesError, "Index does not match table of tuple."}
 	}
-
-	var colIndex int = -1
-	for i, field := range t.Desc.Fields {
-		if field.Fname == f.indexedColName {
-			colIndex = i
-		}
-	}
-	if colIndex == -1 {
+	colIndex, err := findFieldInTd(FieldType{Fname: f.indexedColName, TableQualifier: f.tableFileName, Ftype: EmbeddedStringType},
+		&t.Desc)
+	if err != nil {
 		return GoDBError{IncompatibleTypesError, "Given tuple does not contain indexed column."}
 	}
 
-	var embeddingField EmbeddedStringField = t.Fields[colIndex].(EmbeddedStringField) // TODO: more type checking?
+	var embeddingField EmbeddedStringField = t.Fields[colIndex].(EmbeddedStringField)
 	centroidPageNoIter, err := f.getCentroidPageNoIterator(embeddingField, true, tid, 1)
 	if err != nil {
 		return err
@@ -140,6 +152,7 @@ func (f *NNIndexFile) insertTuple(t *Tuple, tid TransactionID) error {
 	var pageNo int
 	var dt Tuple = Tuple{Desc: dataDesc, Fields: []DBValue{VectorField{embeddingField.Emb}, IntField{int64(t.Rid.(heapRecordId).pageNo)}, IntField{int64(t.Rid.(heapRecordId).slotNo)}}}
 
+	//Scan over all pages for that centroid and try to insert record:
 	for row, err := centroidPageNoIter(); row[0] != -1; row, err = centroidPageNoIter() {
 		if err != nil {
 			return err
@@ -158,6 +171,7 @@ func (f *NNIndexFile) insertTuple(t *Tuple, tid TransactionID) error {
 			break
 		}
 	}
+	//If not inserted, we need to create a new index page for that cluster
 	if !inserted {
 		newPageNo, err := f.dataHeapFile.insertTupleIntoNewPage(&dt, tid)
 		if err != nil {
@@ -212,6 +226,7 @@ func GetEmbeddingGetterFunc(columnName string) func(t *Tuple) (*EmbeddingType, e
 // - centroidFileName: the filename to save the index's centroidHeapFile under
 // - mappingFileName: the filename to save the index's mappingHeapFile under
 // - bp: the buffer pool to use
+
 func ConstructNNIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nClusters int, dataFileName string, centroidFileName string, mappingFileName string, bp *BufferPool) (*NNIndexFile, error) {
 	tid := NewTID()
 

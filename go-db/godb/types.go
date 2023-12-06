@@ -46,6 +46,7 @@ const (
 	IntSizeBytes   int     = int(unsafe.Sizeof(int64(0)))
 	MaxIterKMeans  int     = 10
 	DeltaThrKMeans float64 = 1.0
+	DefaultProbe   int     = 3
 )
 
 var (

@@ -78,6 +78,16 @@ func (f *HeapFile) NumPages() int {
 	return 1 + int((fileSize-1))/int(PageSize)
 }
 
+// Return the number of total tuples in file
+func (f *HeapFile) NTuples() int {
+	nTPerPage, err := f.desc.getNTuplesPerPage(PageSize)
+	if err != nil {
+		panic(err.Error())
+	}
+	n_tuples_per_page := int(nTPerPage)
+	return n_tuples_per_page * f.NumPages()
+}
+
 // Load the contents of a heap file from a specified CSV file.  Parameters are as follows:
 // - hasHeader:  whether or not the CSV file has a header
 // - sep: the character to use to separate fields
