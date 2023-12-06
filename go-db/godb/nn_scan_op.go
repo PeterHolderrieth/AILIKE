@@ -88,9 +88,11 @@ func (v *NNScan) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
 			if err != nil {
 				return nil, err
 			}
-
 		}
-		hrid = heapRecordId{v.heapFile.fileName, int(t.Fields[0].(IntField).Value), int(t.Fields[1].(IntField).Value)}
+		if t == nil {
+			return nil, nil
+		}
+		hrid = heapRecordId{v.heapFile.fileName, int(t.Fields[1].(IntField).Value), int(t.Fields[2].(IntField).Value)}
 		nt, err := v.heapFile.findTuple(hrid, tid)
 		if err != nil {
 			return nil, err
