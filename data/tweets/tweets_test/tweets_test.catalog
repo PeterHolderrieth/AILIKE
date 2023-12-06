@@ -1,0 +1,5 @@
+tweets_test (tweet_id int, sentiment string, content embtext)
+tweets_test_noindex (tweet_id int, sentiment string, content embtext)
+tweets_test__content__data (vector embvec, tablePageNo int, slotNo int)
+tweets_test__content__centroids (vector embvec, centroidId int)
+tweets_test__content__mapping (centroidId int, indexPageNo int)
