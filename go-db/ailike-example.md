@@ -37,6 +37,11 @@ If using the full embeddings, load the data by running:
 \c ../data/tweets/tweets_768/tweets_768.catalog
 ```
 
+To create an index for a table, use (make sure that have loaded the data first!):
+```
+\i tabele col_name num_clusters path/to/file
+```
+example: `\i tweets_mini content 10 ../data/tweets/tweets_384`
 
 NOTE: When loading data, you need to make sure the db configurable variables (UseRandomProj and PageSize) match the parameters that were used to generate the .dat files. Furthermore, you need to make sure that the value of RANDOM_PROJ within embedding.py matches that of UseRandomProj. You may need to restart the python server if they do not match.
 
@@ -47,7 +52,7 @@ Perform queries! Examples:
 - With a coloumn: `select tweet_id, sentiment, (content ailike content) sim from tweets_mini order by sim limit 5;`
 
 Examples that should use index:
-select tweet_id, sentiment, content, (content ailike 'hair migration patterns of professors') sim from tweets_mini order by sim desc limit 5;
+select tweet_id, sentiment, content, (content ailike 'hair migration patterns of professors') dist from tweets_mini order by dist limit 2;
 select tweet_id, sentiment, content, (content ailike 'I am feeling really tired') sim from tweets_mini order by sim desc, sentiment limit 5;
 select max(content ailike 'I am feeling really tired') from tweets_mini;
 

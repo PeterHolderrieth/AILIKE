@@ -48,6 +48,16 @@ func NewHeapFile(fromFile string, td *TupleDesc, bp *BufferPool) (*HeapFile, err
 	return &HeapFile{fileName: fromFile, desc: *td.copy(), bufPool: bp, filePointer: filePointer, pageFull: &pageFull, indexes: indexes}, nil
 }
 
+func NewHeapFileIndex(fromFile string, td *TupleDesc, bp *BufferPool, indexes map[string]*NNIndexFile) (*HeapFile, error) {
+
+	filePointer, err := os.OpenFile(fromFile, os.O_CREATE|os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	var pageFull sync.Map
+	return &HeapFile{fileName: fromFile, desc: *td.copy(), bufPool: bp, filePointer: filePointer, pageFull: &pageFull, indexes: indexes}, nil
+}
+
 // Return the number of bytes in file
 func (f *HeapFile) FileByteSize() int {
 
@@ -143,7 +153,6 @@ func (f *HeapFile) LoadFromCSV(file *os.File, hasHeader bool, sep string, skipLa
 		for j := 0; j < f.NumPages(); j++ {
 			pg, err := bp.GetPage(f, j, tid, ReadPerm)
 			if pg == nil || err != nil {
-				fmt.Println("page nil or error", err)
 				break
 			}
 			if (*pg).isDirty() {
@@ -320,9 +329,8 @@ func (f *HeapFile) insertTupleIntoPage(t *Tuple, pageNo int, tid TransactionID) 
 	return f._insertTupleHelper(hp, t, tid)
 }
 
-// Add the tuple to the HeapFile to a new page. Returns the page number of the
-// new page.
-func (f *HeapFile) insertTupleIntoNewPage(t *Tuple, tid TransactionID) (int, error) {
+// Makes a new heap page and returns it's page number, a pointer to the page, and an error.
+func (f *HeapFile) makeNewPage(tid TransactionID) (*heapPage, int, error) {
 	var np *heapPage = nil
 	var newPageNo int = -1
 	for np == nil {
@@ -340,20 +348,29 @@ func (f *HeapFile) insertTupleIntoNewPage(t *Tuple, tid TransactionID) (int, err
 			hp := newHeapPage(f.Descriptor(), newPageNo, f)
 			err = hp.flushPage() // flush the empty page to disk to update the page count
 			if err != nil {
-				return -1, err
+				return nil, -1, err
 			}
 			// get new page from bufPool
 			np, err = f.getHeapPage(newPageNo, tid, WritePerm)
 			if err != nil {
-				return -1, err
+				return nil, -1, err
 			}
 		}
 	}
+	return np, newPageNo, nil
+}
 
+// Add the tuple to the HeapFile to a new page. Returns the page number of the
+// new page.
+func (f *HeapFile) insertTupleIntoNewPage(t *Tuple, tid TransactionID) (int, error) {
+	np, newPageNo, err := f.makeNewPage(tid)
+	if err != nil {
+		return -1, err
+	}
 	if np.numOpenSlots <= 0 {
 		return -1, GoDBError{PageFullError, "Cannot insert into full page."}
 	}
-	err := f._insertTupleHelper(np, t, tid)
+	err = f._insertTupleHelper(np, t, tid)
 	if err != nil {
 		return -1, err
 	}
@@ -453,7 +470,6 @@ func (f *HeapFile) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
 			hp, err := f.getHeapPage(pageNo, tid, ReadPerm)
 			pageNo += 1
 			if err != nil {
-				fmt.Println("Getting error when getting page.")
 				return nil, err
 			}
 			tupleIter = hp.tupleIter()
