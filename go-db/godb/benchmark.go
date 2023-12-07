@@ -61,17 +61,17 @@ func BenchmarkingInfra(queryName string, query string, config BenchMetaData) (ti
 	end := time.Since(start)
 
 	// Now save output
-	timing_csv_path := config.outputDir + "/" + "ALL_TIMINGS.csv"
-	if queryName == "ALL_TIMINGS" {
-		panic("Query name cannot be ALL_TIMINGS.")
-	}
+	// timing_csv_path := config.outputDir + "/" + "ALL_TIMINGS.csv"
+	// if queryName == "ALL_TIMINGS" {
+	// 	panic("Query name cannot be ALL_TIMINGS.")
+	// }
 	output_csv_path := config.outputDir + "/" + queryName + ".csv"
 	if config.save {
-		timing_csv, err := os.OpenFile(timing_csv_path, os.O_RDWR|os.O_CREATE, 0644)
-		if err != nil {
-			return end, GoDBError{OSError, err.Error()}
-		}
-		fmt.Fprintf(timing_csv, "%s, %v\n", queryName, end)
+		// timing_csv, err := os.OpenFile(timing_csv_path, os.O_RDWR|os.O_CREATE, 0644)
+		// if err != nil {
+		// 	return end, GoDBError{OSError, err.Error()}
+		// }
+		// fmt.Fprintf(timing_csv, "%s, %v\n", queryName, end)
 
 		outfile_csv, err := os.OpenFile(output_csv_path, os.O_RDWR|os.O_CREATE, 0644)
 		if err != nil {
