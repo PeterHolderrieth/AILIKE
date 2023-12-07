@@ -1,7 +1,9 @@
 package godb
 
 import (
+	"fmt"
 	"os"
+	"sync"
 )
 
 // TupleDesc for the heap file that stores the maping from vectors to heapRecordIds.
@@ -29,6 +31,7 @@ var mappingDesc = TupleDesc{Fields: []FieldType{
 type NNIndexFile struct {
 	tableFileName  string // the filename of the table this is an index for
 	indexedColName string // the name of the column being indexed; must be EmbeddedString column
+	clustered      bool   // whether or not this index is clustered
 	// We use a heapFile to store the vector <-> heapRecordId mappings
 	dataHeapFile *HeapFile
 	// We use another heap file to store centroid <-> centroidID mappings
@@ -39,23 +42,30 @@ type NNIndexFile struct {
 }
 
 func (f *NNIndexFile) NCentroids() int {
-	return f.centroidHeapFile.NTuples()
+	return f.centroidHeapFile.ApproximateNumTuples()
 }
 
-func (f *NNIndexFile) NTuples() int {
-	return f.dataHeapFile.NTuples()
+func (f *NNIndexFile) ApproximateNumTuples() int {
+	// Return the approximate number of tuples in the data heap file assuming full pages
+	return f.dataHeapFile.ApproximateNumTuples()
 }
 
 // Create a NnIndexFile.
 // Parameters
 // - fromTableFile: the filename for the HeapFile for the Table that this NN index is for.
 // - indexedColName: the column in the table that is indexed
+// - clusteredDataDesc: nil if this is an unclustered index; otherwise, this should be the same as the descriptor of the corresponding table
 // - fromDataFile: the backing file for this index that store the vector <-> heapRecordId mapping
 // - fromCentroidFile: the backing file for this index that stores the centroid <-> pageNo mapping
 // - bp: the BufferPool that is used to store pages read from this index
 // May return an error if the file cannot be opened or created.
-func NewNNIndexFileFile(tableFileName string, indexedColName string, fromDataFile string, fromCentroidFile string, fromMappingFile string, bp *BufferPool) (*NNIndexFile, error) {
-	dataHeapFile, err := NewHeapFile(fromDataFile, &dataDesc, bp)
+func NewNNIndexFileFile(tableFileName string, indexedColName string, clusteredDataDesc *TupleDesc, fromDataFile string, fromCentroidFile string, fromMappingFile string, bp *BufferPool) (*NNIndexFile, error) {
+	clustered := clusteredDataDesc != nil
+	indexDataDesc := &dataDesc
+	if clustered {
+		indexDataDesc = clusteredDataDesc
+	}
+	dataHeapFile, err := NewHeapFile(fromDataFile, indexDataDesc, bp)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +77,7 @@ func NewNNIndexFileFile(tableFileName string, indexedColName string, fromDataFil
 	if err != nil {
 		return nil, err
 	}
-	return &NNIndexFile{tableFileName, indexedColName, dataHeapFile, centroidHeapFile, mappingHeapFile}, nil
+	return &NNIndexFile{tableFileName, indexedColName, clustered, dataHeapFile, centroidHeapFile, mappingHeapFile}, nil
 }
 
 // Given an embedding, return an iterator that returns the [centroidId, pageNo] pairs ordered by distance between the centroid
@@ -116,7 +126,6 @@ func (f *NNIndexFile) getCentroidPageNoIterator(e EmbeddedStringField, ascending
 
 	var centroidID int
 	var pageNo int
-
 	return func() ([2]int, error) {
 		row, err := joinIter()
 		if err != nil {
@@ -151,6 +160,9 @@ func (f *NNIndexFile) insertTuple(t *Tuple, tid TransactionID) error {
 	var centroidId int
 	var pageNo int
 	var dt Tuple = Tuple{Desc: dataDesc, Fields: []DBValue{VectorField{embeddingField.Emb}, IntField{int64(t.Rid.(heapRecordId).pageNo)}, IntField{int64(t.Rid.(heapRecordId).slotNo)}}}
+	if f.clustered {
+		dt = *t
+	}
 
 	//Scan over all pages for that centroid and try to insert record:
 	for row, err := centroidPageNoIter(); row[0] != -1; row, err = centroidPageNoIter() {
@@ -222,12 +234,19 @@ func GetEmbeddingGetterFunc(columnName string) func(t *Tuple) (*EmbeddingType, e
 // - hfile: the heap file to create an index for
 // - indexedColName: the column in hfile that the index is for
 // - nClusters: the number of clusters to create
-// - dataFileName: the filename to save the index's dataHeapFile under
-// - centroidFileName: the filename to save the index's centroidHeapFile under
-// - mappingFileName: the filename to save the index's mappingHeapFile under
+// - clustered: whether or not to make the index clustered
+// - dbPath: the path to store the index files under
+// - tableName:	the name of the table that the index is for
 // - bp: the buffer pool to use
+func ConstructNNIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nClusters int, clustered bool, dbPath string, tableName string, bp *BufferPool) (*NNIndexFile, error) {
+	indexType := "secondary"
+	if clustered {
+		indexType = "clustered"
+	}
+	dataFileName := fmt.Sprintf("%s/%s__%s__%s__data.dat", dbPath, indexType, tableName, indexedColName)
+	centroidFileName := fmt.Sprintf("%s/%s__%s__%s__centroids.dat", dbPath, indexType, tableName, indexedColName)
+	mappingFileName := fmt.Sprintf("%s/%s__%s__%s__mapping.dat", dbPath, indexType, tableName, indexedColName)
 
-func ConstructNNIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nClusters int, dataFileName string, centroidFileName string, mappingFileName string, bp *BufferPool) (*NNIndexFile, error) {
 	tid := NewTID()
 
 	//Create clustering
@@ -240,7 +259,11 @@ func ConstructNNIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nC
 
 	//Create data file
 	os.Remove(dataFileName)
-	dataHeapFile, err := NewHeapFile(dataFileName, &dataDesc, bp)
+	indexDataDesc := &dataDesc
+	if clustered {
+		indexDataDesc = hfile.Descriptor().copy()
+	}
+	dataHeapFile, err := NewHeapFile(dataFileName, indexDataDesc, bp)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +281,7 @@ func ConstructNNIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nC
 	if err != nil {
 		return nil, err
 	}
-	nnif := &NNIndexFile{hfile.fileName, indexedColName, dataHeapFile, centroidHeapFile, mappingHeapFile}
+	nnif := &NNIndexFile{hfile.fileName, indexedColName, clustered, dataHeapFile, centroidHeapFile, mappingHeapFile}
 
 	// allow stealing pages from buffer pool
 	// NOTE: cannot create indexes cuncurrently with other transactions
@@ -297,7 +320,51 @@ func ConstructNNIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nC
 			return nil, err
 		}
 	}
+
 	bp.CommitTransaction(tid)
+	bp.FlushAllPages()
+
+	fmt.Println("FileSizes after creating the index.")
+	fmt.Println("heap  file: ", hfile.fileName, hfile.NumTuples(tid), hfile.NumPages())
+	fmt.Println("index data: ", nnif.dataHeapFile.fileName, nnif.dataHeapFile.NumTuples(tid), nnif.dataHeapFile.NumPages())
+
+	if clustered {
+		// swap out heapfile backing data with clustered version of data
+		// NOTE: this cannot be done cuncurrently with other transactions
+		oldHeapDataFileCopyPath := hfile.fileName + ".unclustered"
+		err = os.Rename(hfile.fileName, oldHeapDataFileCopyPath)
+		if err != nil {
+			return nil, err
+		}
+
+		var newPageFull sync.Map
+		hfile.pageFull = &newPageFull
+		hfile.filePointer.Close()
+
+		nnif.dataHeapFile.filePointer.Close()
+		err = os.Rename(nnif.dataHeapFile.fileName, hfile.fileName)
+		if err != nil {
+			return nil, err
+		}
+		nnif.dataHeapFile.fileName = hfile.fileName
+
+		newFilePointer, err := os.OpenFile(hfile.fileName, os.O_CREATE|os.O_RDWR, os.ModePerm)
+		if err != nil {
+			return nil, err
+		}
+		nnif.dataHeapFile.filePointer = newFilePointer
+		newFilePointer, err = os.OpenFile(hfile.fileName, os.O_CREATE|os.O_RDWR, os.ModePerm)
+		if err != nil {
+			return nil, err
+		}
+		hfile.filePointer = newFilePointer
+
+		fmt.Println("Files sizes after swapping out data file for clustered index:")
+		fmt.Println("heap  file: ", hfile.fileName, hfile.NumTuples(tid), hfile.NumPages())
+		fmt.Println("index data: ", nnif.dataHeapFile.fileName, nnif.dataHeapFile.NumTuples(tid), nnif.dataHeapFile.NumPages())
+	}
+
+	hfile.indexes[indexedColName] = nnif
 
 	bp.steal = false
 	return nnif, nil
