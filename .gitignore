@@ -24,6 +24,7 @@ go.work
 
 # local data
 data/transitdb/*
+data/tweets/*
 data/tweets/tweets.dat
 
 go-db/godb/benchmark_results/ALL_TIMINGS.csv
