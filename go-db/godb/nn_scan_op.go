@@ -63,15 +63,14 @@ func NewNNScan(heapFile *HeapFile, limit Expr, indexField FieldType, queryExpr C
 
 func (v *NNScan) GetNumberOfProbes() int {
 	nCentroids := v.nnIndexFile.NCentroids()
-	nTuples := v.nnIndexFile.NTuples()
+	nTuples := v.heapFile.ApproximateNumTuples()
 	avgClusterSize := nTuples / nCentroids
 	return v.limitNo/avgClusterSize + DefaultProbe
 }
 
 func (v *NNScan) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
-
+	// TODO: test strategy for number of probes for large limits
 	nProbes := v.GetNumberOfProbes()
-
 	centroidPageIter, err := v.nnIndexFile.getCentroidPageNoIterator(v.queryEmbedding, v.ascending, tid, nProbes)
 	if err != nil {
 		return nil, err
@@ -86,9 +85,14 @@ func (v *NNScan) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
 		if err != nil {
 			return nil, err
 		}
-		for centroidPageNoPair, err := centroidPageIter(); t == nil && (err != nil || centroidPageNoPair[1] != -1); centroidPageNoPair, err = centroidPageIter() {
+		for t == nil {
+			// for centroidPageNoPair, err := centroidPageIter(); t == nil && centroidPageNoPair[1] != -1; centroidPageNoPair, err = centroidPageIter() {
+			centroidPageNoPair, err := centroidPageIter()
 			if err != nil {
 				return nil, err
+			}
+			if centroidPageNoPair[1] == -1 {
+				return nil, nil
 			}
 			nextPageNo := centroidPageNoPair[1]
 			nextIndexPage, err := v.nnIndexFile.dataHeapFile.getHeapPage(nextPageNo, tid, ReadPerm)
@@ -101,8 +105,8 @@ func (v *NNScan) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
 				return nil, err
 			}
 		}
-		if t == nil {
-			return nil, nil
+		if v.nnIndexFile.clustered {
+			return t, nil
 		}
 		hrid = heapRecordId{v.heapFile.fileName, int(t.Fields[1].(IntField).Value), int(t.Fields[2].(IntField).Value)}
 		nt, err := v.heapFile.findTuple(hrid, tid)
@@ -124,5 +128,5 @@ func (v *NNScan) PrettyPrint() string {
 	if v.ascending {
 		orderString = "ascending"
 	}
-	return fmt.Sprintf("{column: %v, table: %v, limit: %v, %v, query: %v}", v.indexField.Fname, v.indexField.TableQualifier, v.limitNo, orderString, query)
+	return fmt.Sprintf("{clustered: %v, column: %v, table: %v, limit: %v, %v, query: %v}", v.nnIndexFile.clustered, v.indexField.Fname, v.indexField.TableQualifier, v.limitNo, orderString, query)
 }

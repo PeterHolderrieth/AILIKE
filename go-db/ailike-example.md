@@ -39,9 +39,9 @@ If using the full embeddings, load the data by running:
 
 To create an index for a table, use (make sure that have loaded the data first!):
 ```
-\i tabele col_name num_clusters path/to/file
+\i tabele col_name num_clusters index_type path/to/file; values for index_type are clustered and secondary
 ```
-example: `\i tweets_mini content 10 ../data/tweets/tweets_384`
+example: `\i tweets_test_clustered content 5 clustered ../data/tweets/tweets_384`
 
 NOTE: When loading data, you need to make sure the db configurable variables (UseRandomProj and PageSize) match the parameters that were used to generate the .dat files. Furthermore, you need to make sure that the value of RANDOM_PROJ within embedding.py matches that of UseRandomProj. You may need to restart the python server if they do not match.
 
@@ -66,3 +66,7 @@ select tweet_id, sentiment, content, (content ailike 'I am feeling really tired'
 select * from tweets_mini limit 10;
 select * from tweets_mini where sentiment = 'enthusiasm' limit 10;
 select max(content ailike 'I am feeling really tired'), min(content ailike 'I am feeling really energized') from tweets_mini;
+
+How to count numbers of pages per cluster:
+select centroidid, count(indexpageno) from secondary__tweets_mini__content__mapping group by centroidid;
+select tweet_id, sentiment, content, (content ailike 'hair migration patterns of professors') dist from tweets order by dist limit 2;

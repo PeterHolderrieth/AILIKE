@@ -78,14 +78,30 @@ func (f *HeapFile) NumPages() int {
 	return 1 + int((fileSize-1))/int(PageSize)
 }
 
-// Return the number of total tuples in file
-func (f *HeapFile) NTuples() int {
-	nTPerPage, err := f.desc.getNTuplesPerPage(PageSize)
+// Return the number of total tuples in file assuming full pages
+func (f *HeapFile) ApproximateNumTuples() int {
+	nTPerPage, err := f.desc.getNumSlotsPerPage(PageSize)
 	if err != nil {
 		panic(err.Error())
 	}
 	n_tuples_per_page := int(nTPerPage)
 	return n_tuples_per_page * f.NumPages()
+}
+
+// Return the number of tuples in the heap file
+func (f *HeapFile) NumTuples(tid TransactionID) int {
+	var numTuples int = 0
+	for pageNo := 0; pageNo < f.NumPages(); pageNo++ {
+		hp, err := f.getHeapPage(pageNo, tid, ReadPerm)
+		if err != nil {
+			return -1
+		}
+		pageTuples := int(hp.numSlots - hp.numOpenSlots)
+		numTuples += pageTuples
+		// fmt.Println("Page: ", pageNo, "Tuples: ", pageTuples)
+	}
+
+	return numTuples
 }
 
 // Load the contents of a heap file from a specified CSV file.  Parameters are as follows:
@@ -264,19 +280,6 @@ func (f *HeapFile) getPageForInsert(tid TransactionID) (*heapPage, error) {
 }
 
 func (f *HeapFile) _insertTupleHelper(hp *heapPage, t *Tuple, tid TransactionID) error {
-	//Create embedding for every text field:
-	for i, field := range t.Desc.Fields {
-		if field.Ftype == EmbeddedStringType {
-			EmbeddedStringField := t.Fields[i].(EmbeddedStringField)
-			embResp, err := generateEmbeddings(EmbeddedStringField.Value)
-			if err != nil {
-				return err
-			}
-			EmbeddedStringField.Emb = embResp.Embedding
-			t.Fields[i] = EmbeddedStringField
-		}
-	}
-
 	rid, err := hp.insertTuple(t)
 	if err != nil {
 		return err
@@ -284,8 +287,11 @@ func (f *HeapFile) _insertTupleHelper(hp *heapPage, t *Tuple, tid TransactionID)
 	t.Rid = rid
 	f.pageFull.Store(hp.pageNo, hp.numOpenSlots == 0)
 
-	// Insert tuple into all associated indexes
+	// Insert tuple into all associated secondary indexes
 	for _, index := range f.indexes {
+		if index.clustered {
+			continue
+		}
 		err = index.insertTuple(t, tid)
 		if err != nil {
 			return err
@@ -307,7 +313,34 @@ func (f *HeapFile) _insertTupleHelper(hp *heapPage, t *Tuple, tid TransactionID)
 // worry about concurrent transactions modifying the Page or HeapFile.  We will
 // add support for concurrent modifications in lab 3.
 func (f *HeapFile) insertTuple(t *Tuple, tid TransactionID) error {
+	// Create embedding for every embedded string field; note we do not call
+	// this method in insertTupleIntoPage or insertTupleIntoNewPage because
+	// those methods are only called once the embedding has already been
+	// generated; TODO: consider refactoring this to be more explicit about this behavior.
+	for i, field := range t.Desc.Fields {
+		if field.Ftype == EmbeddedStringType {
+			EmbeddedStringField := t.Fields[i].(EmbeddedStringField)
+			embResp, err := generateEmbeddings(EmbeddedStringField.Value)
+			if err != nil {
+				return err
+			}
+			EmbeddedStringField.Emb = embResp.Embedding
+			t.Fields[i] = EmbeddedStringField
+		}
+	}
 
+	var clusteredIndex *NNIndexFile = nil
+	for _, index := range f.indexes {
+		if index.clustered {
+			if clusteredIndex != nil {
+				return GoDBError{IncompatibleTypesError, "(insertTuple): Multiple clustered indexes found."}
+			}
+			clusteredIndex = index
+		}
+	}
+	if clusteredIndex != nil {
+		return clusteredIndex.insertTuple(t, tid)
+	}
 	hp, err := f.getPageForInsert(tid)
 	if err != nil {
 		return err
@@ -318,7 +351,6 @@ func (f *HeapFile) insertTuple(t *Tuple, tid TransactionID) error {
 // Add the tuple to the HeapFile to a specific page. If that page is full,
 // returns an error.
 func (f *HeapFile) insertTupleIntoPage(t *Tuple, pageNo int, tid TransactionID) error {
-
 	hp, err := f.getHeapPage(pageNo, tid, WritePerm)
 	if err != nil {
 		return err
