@@ -160,13 +160,18 @@ func (c *Catalog) tableNameToFile(tableName string) string {
 	return c.rootPath + "/" + tableName + ".dat"
 }
 
+func _getFileNameKey(fileType string, indexType string) string {
+	return fileType + "|" + indexType
+}
+
 func (c *Catalog) GetTable(named string) (DBFile, error) {
 	t := c.tableMap[named]
 	if t == nil {
 		return nil, GoDBError{NoSuchTableError, fmt.Sprintf("no table '%s' found", named)}
 	}
 
-	var iFilenames = make(map[string]map[string]string)
+	iFilenames := make(map[string]map[string]string)
+	indexTypeMap := make(map[string]string) // maps column name to whether or not index is clustered on that column
 	files, err := ioutil.ReadDir(c.rootPath)
 	if err == nil {
 		for _, f := range files {
@@ -178,39 +183,58 @@ func (c *Catalog) GetTable(named string) (DBFile, error) {
 			if len(split_name) != 4 {
 				continue
 			}
-			if split_name[0] != "index" {
-				continue
-			}
-			if split_name[1] != named {
-				continue
-			}
+			indexType := split_name[0]
+			tableName := split_name[1]
 			col := split_name[2]
 			fileType := split_name[3]
+
+			if indexType != "clustered" && indexType != "secondary" {
+				continue
+			}
+
+			if tableName != named {
+				continue
+			}
+
 			if _, found := iFilenames[col]; !found {
 				iFilenames[col] = make(map[string]string)
 			}
 
-			iFilenames[col][fileType] = c.rootPath + "/" + f.Name()
+			iFilenames[col][_getFileNameKey(fileType, indexType)] = c.rootPath + "/" + f.Name()
+			indexTypeMap[col] = indexType
 		}
 	}
 
 	var NNindexes = make(map[string]*NNIndexFile)
-	for key, val := range iFilenames {
-		if _, found := val["data"]; !found {
+	for col, val := range iFilenames {
+		indexType := indexTypeMap[col]
+		dataFileName := val[_getFileNameKey("data", indexType)]
+		centroidFileName := val[_getFileNameKey("centroids", indexType)]
+		mappingFileName := val[_getFileNameKey("mapping", indexType)]
+		if indexType == "clustered" {
+			dataFileName = c.tableNameToFile(named)
+		} else {
+			if _, found := val[_getFileNameKey("data", indexType)]; !found {
+				continue
+			}
+		}
+		if _, found := val[_getFileNameKey("mapping", indexType)]; !found {
 			continue
 		}
-		if _, found := val["mapping"]; !found {
+		if _, found := val[_getFileNameKey("centroids", indexType)]; !found {
 			continue
 		}
-		if _, found := val["centroids"]; !found {
-			continue
+
+		var indexDataDesc *TupleDesc = nil
+		if indexType == "clustered" {
+			indexDataDesc = t.desc.copy()
 		}
-		index, err := NewNNIndexFileFile(named, key, val["data"], val["centroids"],
-			val["mapping"], c.bp)
+		index, err := NewNNIndexFileFile(named, col, indexDataDesc, dataFileName, centroidFileName,
+			mappingFileName, c.bp)
 		if err != nil {
 			break
 		}
-		NNindexes[key] = index
+		NNindexes[col] = index
 	}
 
 	return NewHeapFileIndex(c.tableNameToFile(named), t.desc.copy(), c.bp, NNindexes)

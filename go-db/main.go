@@ -30,7 +30,7 @@ Available shell commands:
 	\f : List available functions for use in queries
 	\a : Toggle aligned vs csv output
 	\l : table path/to/file [sep] [hasHeader]: Append csv file to end of table.  Default to sep = ',', hasHeader = 'true'
-	\i : table column_name num_clusters path/to/file`
+	\i : table column_name num_clusters index_type path/to/file`
 
 /*func printCatalog(fname string) {
 	f, err := os.Open(fname)
@@ -212,8 +212,8 @@ func main() {
 				fmt.Printf("\033[32;1mLOAD\033[0m\n\n")
 			case 'i':
 				splits := strings.Split(text, " ")
-				if len(splits) != 5 {
-					fmt.Println("Usage is i table_name col_name num_clusters path_to_table")
+				if len(splits) != 6 {
+					fmt.Println("Usage is i table_name col_name num_clusters path_to_table index_type")
 					break
 				}
 				table := splits[1]
@@ -223,16 +223,19 @@ func main() {
 					fmt.Println("Please use an integer as the number of clusters")
 					break
 				}
-				path := splits[4]
+				indexType := splits[4]
+				if indexType != "secondary" && indexType != "clustered" {
+					fmt.Println("Please use secondary or clustered as the index type")
+					break
+				}
+				clustered := indexType == "clustered"
+				path := splits[5]
 				hf, err := c.GetTable(table)
 				if err != nil {
 					fmt.Println("Please load the table first before trying to construct the index")
 				}
 
-				_, err = godb.ConstructNNIndexFileFromHeapFile(hf.(*godb.HeapFile), col, clusters,
-					path+"/index__"+table+"__"+col+"__data.dat",
-					path+"/index__"+table+"__"+col+"__centroids.dat",
-					path+"/index__"+table+"__"+col+"__mapping.dat", bp)
+				_, err = godb.ConstructNNIndexFileFromHeapFile(hf.(*godb.HeapFile), col, clusters, clustered, path, table, bp)
 
 				if err != nil {
 					fmt.Println("failed to construct index file, %s", err.Error())

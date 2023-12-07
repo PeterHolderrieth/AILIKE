@@ -139,7 +139,7 @@ func (desc *TupleDesc) sizeInBytes() int {
 }
 
 // Compute number of tuples that fit into a page given the descriptor
-func (desc *TupleDesc) getNTuplesPerPage(pagesize int) (int32, error) {
+func (desc *TupleDesc) getNumSlotsPerPage(pagesize int) (int32, error) {
 
 	remPageSize := pagesize - 8 // bytes after header
 
