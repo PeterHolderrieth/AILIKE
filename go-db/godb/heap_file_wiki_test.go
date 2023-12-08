@@ -18,7 +18,7 @@ func TestConstructWikiHeapFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	fmt.Println("Number of tuples in heap file: ", hfile.NTuples())
+	fmt.Println("Number of tuples in heap file: ", hfile.NumTotalTuples())
 	tid := NewTID()
 	hfileIter, err := hfile.Iterator(tid)
 	if err != nil {
@@ -38,7 +38,7 @@ func TestConstructFullWikiHeapFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	fmt.Println("Number of tuples in heap file: ", hfile.NTuples())
+	fmt.Println("Number of tuples in heap file: ", hfile.NumTotalTuples())
 	tid := NewTID()
 	hfileIter, err := hfile.Iterator(tid)
 	if err != nil {

@@ -64,12 +64,13 @@ type heapPage struct {
 
 // Construct a new heap page
 func newHeapPage(desc *TupleDesc, pageNo int, f *HeapFile) *heapPage {
-	bytesPerTuple := desc.sizeInBytes()
-	remPageSize := PageSize - 8             // bytes after header
-	numSlots := remPageSize / bytesPerTuple //integer division will round down
+	numSlots, err := desc.getNumSlotsPerPage(PageSize)
+	if err != nil {
+		panic(err.Error())
+	}
 	records := make([]*Tuple, numSlots)
 
-	return &heapPage{numSlots: int32(numSlots), numOpenSlots: int32(numSlots), pageNo: pageNo, filePointer: f, records: records}
+	return &heapPage{numSlots: int32(numSlots), numOpenSlots: numSlots, pageNo: pageNo, filePointer: f, records: records}
 }
 
 func (h *heapPage) getNumOpenSlots() int {
