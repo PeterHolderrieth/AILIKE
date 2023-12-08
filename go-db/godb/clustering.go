@@ -26,7 +26,7 @@ func newClustering(nClusters, embDim int, storeEmbs bool) *Clustering {
 		sumClusterDist: make(map[int]float64),
 		maxNClusters:   nClusters,
 		embDim:         embDim,
-		distFunc:       MSEDist,
+		distFunc:       NegativeDotProduct,
 		storeEmbs:      storeEmbs,
 	}
 }
