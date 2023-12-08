@@ -39,7 +39,7 @@ func TestConstructIndexUnclustered(t *testing.T) {
 
 func TestConstructIndexClustered(t *testing.T) {
 	var num_records int = 100 // tweets_test has 100 records in it
-	hfile, bp, err := MakeTestDatabaseFromCsv("tweets_test", "../../data/tweets/tweets_test.csv", 10)
+	hfile, bp, err := MakeTestDatabaseFromCsv("tweets_test_clustered", "../../data/tweets/tweets_test.csv", 10)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
