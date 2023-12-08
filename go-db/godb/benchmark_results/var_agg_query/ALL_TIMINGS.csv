@@ -1,0 +1,10 @@
+tweets, 4.753898083s
+tweets_2500, 265.969875ms
+tweets_5000, 558.406833ms
+tweets_10000, 1.1640755s
+tweets_20000, 2.347258667s
+tweets_c_250, 43.894ms
+tweets_2500_c_16, 4.424167ms
+tweets_5000_c_31, 6.179916ms
+tweets_10000_c_62, 3.943083ms
+tweets_20000_c_125, 4.820958ms

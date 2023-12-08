@@ -68,6 +68,7 @@ func (v *NNScan) GetNumberOfProbes() int {
 	return v.limitNo/avgClusterSize + DefaultProbe
 }
 
+
 func (v *NNScan) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
 	// TODO: test strategy for number of probes for large limits
 	nProbes := v.GetNumberOfProbes()

@@ -1,0 +1,14 @@
+tweets_2, 7.814652s
+tweets_4, 7.70929725s
+tweets_8, 7.769435541s
+tweets_32, 7.6960895s
+tweets_64, 7.647708167s
+tweets_128, 7.695071708s
+tweets_256, 7.645748167s
+tweets_c_250_2, 11.87175ms
+tweets_c_250_4, 9.375209ms
+tweets_c_250_8, 32.341541ms
+tweets_c_250_32, 11.958292ms
+tweets_c_250_64, 12.382959ms
+tweets_c_250_128, 11.665333ms
+tweets_c_250_256, 12.713792ms
