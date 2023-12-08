@@ -89,15 +89,15 @@ func makeVecTestVars() (TupleDesc, Tuple, Tuple, *HeapFile, *BufferPool, Transac
 		{Fname: "name", Ftype: StringType},
 		{Fname: "age", Ftype: IntType},
 		{Fname: "biography", Ftype: VectorFieldType},
-	}}	
+	}}
 
 	// Initialize with random numbers
 	emb1 := make([]float64, TextEmbeddingDim)
 	emb2 := make([]float64, TextEmbeddingDim)
-	
+
 	for i := 1; i < TextEmbeddingDim; i++ {
-		emb1[i] = rand.Float64();
-		emb2[i] = rand.Float64();
+		emb1[i] = rand.Float64()
+		emb2[i] = rand.Float64()
 	}
 
 	var t1 = Tuple{
