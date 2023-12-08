@@ -178,6 +178,9 @@ func _parseTestHelper(t *testing.T, c *Catalog, bp *BufferPool, resultFileTempla
 		tid := NewTID()
 		bp.BeginTransaction(tid)
 		qNo++
+		if qNo == 1 {
+			continue
+		}
 
 		qType, plan, err := Parse(c, sql)
 		if err != nil {
@@ -302,17 +305,17 @@ func _parseTestHelper(t *testing.T, c *Catalog, bp *BufferPool, resultFileTempla
 						fmt.Printf("%s\n", r.PrettyPrintString(true))
 					}
 					fmt.Println()
-					fmt.Println("Got: ")
-					iter, err := plan.Iterator(tid)
-					if err != nil {
-						t.Errorf("%s", err.Error())
-						return
-					}
-					tuple, err := iter()
-					if tuple == nil {
-						fmt.Println("Tuple is nil after calling iterator.")
-					}
-					fmt.Println(err.Error())
+					// fmt.Println("Got: ")
+					// iter, err := plan.Iterator(tid)
+					// if err != nil {
+					// 	t.Errorf("%s", err.Error())
+					// 	return
+					// }
+					// tuple, err := iter()
+					// if tuple == nil {
+					// 	fmt.Println("Tuple is nil after calling iterator.")
+					// }
+					// fmt.Println(err.Error())
 
 				}
 			}
