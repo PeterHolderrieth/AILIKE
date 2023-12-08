@@ -10,10 +10,8 @@ func generate_indexpath(c *godb.Catalog, table string, column string, clusters i
 	bp := godb.NewBufferPool(1000)
 	hf, err := c.GetTable(table)
 	fmt.Println("Generating index for ", table)
-	_, err = godb.ConstructNNIndexFileFromHeapFile(hf.(*godb.HeapFile), column, clusters,
-		path+"/index__"+table+"__"+column+"__data.dat",
-		path+"/index__"+table+"__"+column+"__centroids.dat",
-		path+"/index__"+table+"__"+column+"__mapping.dat", bp)
+	_, err = godb.ConstructNNIndexFileFromHeapFile(hf.(*godb.HeapFile), column, clusters, false,
+		path, table, bp)
 
 	if err != nil {
 		fmt.Println("Failed to construct index file for ", table)

@@ -137,7 +137,7 @@ func speedup_vary_probe(tables []string, N []int, catalog string, path string, q
 		time, err := BenchmarkingInfra(table + "_" + strconv.Itoa(n), query_gen(table), config)
 		if err != nil {
 			fmt.Println("Failed for ", table , " with probe = ", n)
-			continue 
+			continue
 		}
 		fmt.Println("Time taken for ", table, " with ", n, "=", time)
 		}
