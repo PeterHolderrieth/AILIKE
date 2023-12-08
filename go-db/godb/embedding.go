@@ -14,7 +14,7 @@ type EmbeddingResponse struct {
 	Embedding EmbeddingType `json:"embedding"`
 }
 
-var portNumber string = "7010"
+var portNumberEmb string = "7010"
 
 func generateEmbeddings(text string) (*EmbeddingResponse, error) {
 
@@ -31,7 +31,7 @@ func generateEmbeddings(text string) (*EmbeddingResponse, error) {
 	}
 
 	// Send a POST request to the Python server
-	resp, err := http.Post("http://localhost:"+portNumber+"/embed", "application/json",
+	resp, err := http.Post("http://localhost:"+portNumberEmb+"/embed", "application/json",
 		bytes.NewBuffer(jsonData))
 	if err != nil {
 		fmt.Println("Error sending HTTP request:", err)
@@ -70,7 +70,7 @@ func getEmbeddingDim() int {
 	}
 
 	// Send a POST request to the Python server
-	resp, err := http.Post("http://localhost:"+portNumber+"/dimemb", "application/json",
+	resp, err := http.Post("http://localhost:"+portNumberEmb+"/dimemb", "application/json",
 		bytes.NewBuffer(jsonData))
 	if err != nil {
 		fmt.Println("Error sending HTTP request:", err)
