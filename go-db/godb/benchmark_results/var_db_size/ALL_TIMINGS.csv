@@ -1,11 +1,10 @@
-
-tweets, 7801
-tweets_2500, 439
-tweets_5000, 938
-tweets_10000, 1894
-tweets_20000, 3871
-tweets_c_250, 11
-tweets_2500_c_16, 89
-tweets_5000_c_31, 13
-tweets_10000_c_62, 11
-tweets_20000_c_125, 6
+tweets, 7650
+tweets_2500, 451
+tweets_5000, 927
+tweets_10000, 1897
+tweets_20000, 3797
+tweets_c_250, 16
+tweets_2500_c_16, 37
+tweets_5000_c_31, 48
+tweets_10000_c_62, 12
+tweets_20000_c_125, 9

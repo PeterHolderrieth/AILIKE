@@ -144,28 +144,15 @@ func speedup_vary_probe(tables []string, N []int, catalog string, path string, q
 	}
 }
 
+func query_gen_probe(table string) string {
+	return "select sentiment, content, (content ailike 'the migration patterns of professor hair') sim from " + table + " order by sim desc, sentiment limit 20;"
+}
+
 func TestDefaultProbe(t *testing.T) {
 	catalog := "tweets_384.catalog"
 	catalog_path := "/Users/manyab/AILIKE/data/tweets/tweets_384"
 	tables := []string{"tweets", "tweets_c_250"}
 	N := []int{1, 2, 3, 4, 5, 6, 7};
-	speedup_vary_probe(tables, N, catalog, catalog_path, query_gen_1);
+	speedup_vary_probe(tables, N, catalog, catalog_path, query_gen_probe);
 	return
 }
-
-// func TestDefaultProbe(t *testing.T) {
-// 	var config = BenchMetaData{
-// 		catalog:   "tweets_384.catalog",
-// 		dbDir:     "/Users/manyab/AILIKE/data/tweets/tweets_384",
-// 		outputDir: "./benchmark_results/test",
-// 		bpSize:    10,
-// 		save:      false}
-// 		DefaultProbe = 4;
-// 	time, err := BenchmarkingInfra("test",  query_gen_1("tweets_c_250"), config)
-// 	DefaultProbe = 5;
-// 	time, err = BenchmarkingInfra("test",  query_gen_1("tweets_c_250"), config)
-// 	if err != nil {
-// 		t.Errorf("%s", err.Error())
-// 	}
-// 	fmt.Println("Time taken = ", time)
-// }
