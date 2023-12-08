@@ -1,5 +1,6 @@
-tweets, 7.759339958s
-tweets_c_50, 25.990458ms
-tweets_c_100, 25.647667ms
-tweets_c_250, 11.552792ms
-tweets_c_500, 11.633834ms
+
+tweets, 7726
+tweets_c_50, 26
+tweets_c_100, 25
+tweets_c_250, 11
+tweets_c_500, 11

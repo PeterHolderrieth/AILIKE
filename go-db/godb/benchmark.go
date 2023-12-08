@@ -22,30 +22,30 @@ func newBenchMetaData(catalog string, dbDir string, bpSize int, outputDir string
 //   - saves the results in a file titled by queryName
 //   - saves the time taken to run the query
 //   - returns the time taken to run the query
-func BenchmarkingInfra(queryName string, query string, config BenchMetaData) (time.Duration, error) {
+func BenchmarkingInfra(queryName string, query string, config BenchMetaData) (int64, error) {
 	bp := NewBufferPool(config.bpSize)
 	c, err := NewCatalogFromFile(config.catalog, bp, config.dbDir)
 	if err != nil {
-		return time.Duration(0), err
+		return 0, err
 	}
 	qType, plan, err := Parse(c, query)
 	if err != nil {
-		return time.Duration(0), err
+		return 0, err
 	}
 	if plan == nil {
-		return time.Duration(0), GoDBError{ParseError, "Plan was nil"}
+		return 0, GoDBError{ParseError, "Plan was nil"}
 	}
 	if qType != IteratorType {
-		return time.Duration(0), GoDBError{ParseError, "Plan is not of iterator type"}
+		return 0, GoDBError{ParseError, "Plan is not of iterator type"}
 	}
 	desc := plan.Descriptor()
 	if desc == nil {
-		return time.Duration(0), GoDBError{ParseError, "Descriptor was nil"}
+		return 0, GoDBError{ParseError, "Descriptor was nil"}
 	}
 	tid := NewTID()
 	iter, err := plan.Iterator(tid)
 	if err != nil {
-		return time.Duration(0), err
+		return 0, err
 	}
 
 	// Run once to collect timing information
@@ -56,7 +56,7 @@ func BenchmarkingInfra(queryName string, query string, config BenchMetaData) (ti
 		// Comment out this check while actually
 		// benchmarking, here right now for debugging help
 		if err != nil {
-			return time.Duration(0), err
+			return 0, err
 		}
 		if tup == nil {
 			break
@@ -73,23 +73,23 @@ func BenchmarkingInfra(queryName string, query string, config BenchMetaData) (ti
 	if config.save {
 		timing_csv, err := os.OpenFile(timing_csv_path, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0644)
 		if err != nil {
-			return end, GoDBError{OSError, err.Error()}
+			return 0, GoDBError{OSError, err.Error()}
 		}
-		fmt.Fprintf(timing_csv, "%s, %v\n", queryName, end)
+		fmt.Fprintf(timing_csv, "%s, %v\n", queryName, end.Milliseconds())
 
 		outfile_csv, err := os.OpenFile(output_csv_path, os.O_RDWR|os.O_CREATE, 0644)
 		if err != nil {
-			return end, GoDBError{OSError, err.Error()}
+			return 0, GoDBError{OSError, err.Error()}
 		}
-		fmt.Fprintf(outfile_csv, "%s\n", plan.Descriptor().HeaderString(false))
+		// fmt.Fprintf(outfile_csv, "%s\n", plan.Descriptor().HeaderString(false))
 		iter, err = plan.Iterator(tid)
 		if err != nil {
-			return time.Duration(0), err
+			return 0, err
 		}
 		for {
 			tup, err := iter()
 			if err != nil {
-				return end, err
+				return 0, err
 			}
 			if tup == nil {
 				break
@@ -98,5 +98,5 @@ func BenchmarkingInfra(queryName string, query string, config BenchMetaData) (ti
 		}
 	}
 
-	return end, nil
+	return end.Milliseconds(), nil
 }
