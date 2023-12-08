@@ -298,5 +298,5 @@ func ailikeVecFunc(args []any) any {
 		panic("Failed to compute dot product in AILIKE")
 	}
 
-	return int64(-r)
+	return int64(-r * 1000)
 }
