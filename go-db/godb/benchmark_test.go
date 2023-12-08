@@ -127,3 +127,45 @@ func TestVaryLimit(t *testing.T) {
 	speedup_vary_n(tables, N, catalog, catalog_path, query_gen_n);
 	return
 }
+
+func speedup_vary_probe(tables []string, N []int, catalog string, path string, query_gen fn) {
+	for _, table := range tables {
+		for _, n := range N {
+		var config = newBenchMetaData(catalog, path, 1000,
+			"./benchmark_results/var_probe", true)
+		DefaultProbe = n;
+		time, err := BenchmarkingInfra(table + "_" + strconv.Itoa(n), query_gen(table), config)
+		if err != nil {
+			fmt.Println("Failed for ", table , " with probe = ", n)
+			continue 
+		}
+		fmt.Println("Time taken for ", table, " with ", n, "=", time)
+		}
+	}
+}
+
+func TestDefaultProbe(t *testing.T) {
+	catalog := "tweets_384.catalog"
+	catalog_path := "/Users/manyab/AILIKE/data/tweets/tweets_384"
+	tables := []string{"tweets", "tweets_c_250"}
+	N := []int{1, 2, 3, 4, 5, 6, 7};
+	speedup_vary_probe(tables, N, catalog, catalog_path, query_gen_1);
+	return
+}
+
+// func TestDefaultProbe(t *testing.T) {
+// 	var config = BenchMetaData{
+// 		catalog:   "tweets_384.catalog",
+// 		dbDir:     "/Users/manyab/AILIKE/data/tweets/tweets_384",
+// 		outputDir: "./benchmark_results/test",
+// 		bpSize:    10,
+// 		save:      false}
+// 		DefaultProbe = 4;
+// 	time, err := BenchmarkingInfra("test",  query_gen_1("tweets_c_250"), config)
+// 	DefaultProbe = 5;
+// 	time, err = BenchmarkingInfra("test",  query_gen_1("tweets_c_250"), config)
+// 	if err != nil {
+// 		t.Errorf("%s", err.Error())
+// 	}
+// 	fmt.Println("Time taken = ", time)
+// }

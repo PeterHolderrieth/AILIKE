@@ -46,7 +46,7 @@ const (
 	IntSizeBytes   int     = int(unsafe.Sizeof(int64(0)))
 	MaxIterKMeans  int     = 10
 	DeltaThrKMeans float64 = 1.0
-	DefaultProbe   int     = 3
+	
 )
 
 var (
@@ -58,6 +58,7 @@ var (
 	TextEmbeddingDim   int = 384
 	EmbeddingSizeBytes int = TextEmbeddingDim * FloatSizeBytes
 	TextSizeBytes      int = EmbeddingSizeBytes + TextCharLength
+	DefaultProbe   		 int     = 3
 )
 
 // Currently unused; TODO: call this function when updating the config

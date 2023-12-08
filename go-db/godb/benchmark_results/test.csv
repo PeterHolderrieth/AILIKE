@@ -1,4 +1,3 @@
-t_text.biography,t_text.ailike
 sam is a 25-year-old lawyer. He enjoys playing guitar in their free time.,-43
 kathy is a 45-year-old teacher who enjoys gaming in their free time,-39
 bill is a 30-year-old architect who enjoys playing guitar in their free time.,-40
@@ -11,6 +10,7 @@ bo is a 99-year-old journalist who enjoys reading in their free time.,-40
 pat is a 38-year-old musician who enjoys cooking in their free time.,-39
 sam is a 99-year-old journalist who enjoys photography in their free time.,-40
 riza is a 22-year-old architect who enjoys swimming in their free time.,-39
+imming in their free time.,-39
 ..],-40
 pat is a 38-year-old musician who enjoys cooking in their free time. [-0.1764797568321228,...],-39
 sam is a 99-year-old journalist who enjoys photography in their free time. [0.15623918175697327,...],-40

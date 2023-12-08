@@ -72,6 +72,8 @@ func (v *NNScan) GetNumberOfProbes() int {
 func (v *NNScan) Iterator(tid TransactionID) (func() (*Tuple, error), error) {
 	// TODO: test strategy for number of probes for large limits
 	nProbes := v.GetNumberOfProbes()
+	fmt.Println("Default Probe = ", DefaultProbe, "Num Probes = ", nProbes)
+
 	centroidPageIter, err := v.nnIndexFile.getCentroidPageNoIterator(v.queryEmbedding, v.ascending, tid, nProbes)
 	if err != nil {
 		return nil, err
