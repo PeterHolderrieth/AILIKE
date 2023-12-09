@@ -69,4 +69,4 @@ select max(content ailike 'I am feeling really tired'), min(content ailike 'I am
 
 How to count numbers of pages per cluster:
 select centroidid, count(indexpageno) from secondary__tweets_mini__content__mapping group by centroidid;
-select tweet_id, sentiment, content, (content ailike 'hair migration patterns of professors') dist from tweets order by dist limit 2;
+select tweet_id, sentiment, content, (content ailike 'hair migration patterns of professors') dist from tweets order by dist limit 5;
