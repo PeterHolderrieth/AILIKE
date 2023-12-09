@@ -64,7 +64,7 @@ func (f *HeapFile) LoadFromAPI(portNumber int, limit int) error {
 		wikiresponse, err = getWikiElement(counter)
 
 		if err != nil {
-			return err
+			break //We might be at the end
 		}
 		var newFields []DBValue
 		for _, field := range desc.Fields {

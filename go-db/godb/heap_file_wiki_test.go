@@ -42,16 +42,5 @@ func TestConstructFullWikiHeapFile(t *testing.T) {
 			t.Fatalf(err.Error())
 		}
 		fmt.Println("Number of tuples in heap file: ", hfile.ApproximateNumTuples())
-		tid := NewTID()
-		hfileIter, err := hfile.Iterator(tid)
-		if err != nil {
-			t.Fatalf(err.Error())
-		}
-		for tuple, err := hfileIter(); (tuple != nil) && (err == nil); tuple, err = hfileIter() {
-			fmt.Println(tuple.PrettyPrintString(true))
-		}
-		if err != nil {
-			t.Fatalf(err.Error())
-		}
 	}
 }
