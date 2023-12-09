@@ -133,7 +133,7 @@ func speedup_vary_probe(tables []string, N []int, catalog string, path string, q
 		for _, n := range N {
 		var config = newBenchMetaData(catalog, path, 1000,
 			"./benchmark_results/var_probe", true)
-		DefaultProbe = n;
+		DefaultProbe = n + 10;
 		time, err := BenchmarkingInfra(table + "_" + strconv.Itoa(n), query_gen(table), config)
 		if err != nil {
 			fmt.Println("Failed for ", table , " with probe = ", n)
@@ -145,7 +145,7 @@ func speedup_vary_probe(tables []string, N []int, catalog string, path string, q
 }
 
 func query_gen_probe(table string) string {
-	return "select sentiment, content, (content ailike 'the migration patterns of professor hair') sim from " + table + " order by sim desc, sentiment limit 20;"
+	return "select sentiment, content, (content ailike 'the migration patterns of professor hair') sim from " + table + " order by sim desc, sentiment limit 40;"
 }
 
 func TestDefaultProbe(t *testing.T) {

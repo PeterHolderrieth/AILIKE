@@ -94,7 +94,7 @@ func BenchmarkingInfra(queryName string, query string, config BenchMetaData) (in
 			if tup == nil {
 				break
 			}
-			fmt.Fprintf(outfile_csv, "%s\n", tup.PrettyPrintString(false))
+			fmt.Fprintf(outfile_csv, "%s\n", tup.Fields[1].(EmbeddedStringField).Value)
 		}
 	}
 
