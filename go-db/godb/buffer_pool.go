@@ -106,6 +106,10 @@ func (bp *BufferPool) FlushAllPages() {
 	}
 }
 
+func (bp *BufferPool) ClearAllPages() {
+	bp.pageMap = make(map[BufferPoolKey]Page, bp.numPages)
+}
+
 // _cleanUpTransaction releases all locks held by the transactions and removes the transaction from
 // BufferPool data structures. We assume the calling method holds the mutex for the buffer pool.
 func (bp *BufferPool) _cleanUpTransaction(tid TransactionID) {
