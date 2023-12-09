@@ -323,10 +323,7 @@ func ConstructNNIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nC
 
 	bp.CommitTransaction(tid)
 	bp.FlushAllPages()
-
-	fmt.Println("FileSizes after creating the index.")
-	fmt.Println("heap  file: ", hfile.fileName, hfile.NumTuples(tid), hfile.NumPages())
-	fmt.Println("index data: ", nnif.dataHeapFile.fileName, nnif.dataHeapFile.NumTuples(tid), nnif.dataHeapFile.NumPages())
+	bp.steal = false
 
 	if clustered {
 		// swap out heapfile backing data with clustered version of data
@@ -339,33 +336,21 @@ func ConstructNNIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nC
 
 		var newPageFull sync.Map
 		hfile.pageFull = &newPageFull
-		hfile.filePointer.Close()
 
-		nnif.dataHeapFile.filePointer.Close()
 		err = os.Rename(nnif.dataHeapFile.fileName, hfile.fileName)
 		if err != nil {
 			return nil, err
 		}
 		nnif.dataHeapFile.fileName = hfile.fileName
+		bp.ClearAllPages() // Need to reset the bufferpool after re-naming files
 
-		newFilePointer, err := os.OpenFile(hfile.fileName, os.O_CREATE|os.O_RDWR, os.ModePerm)
-		if err != nil {
-			return nil, err
-		}
-		nnif.dataHeapFile.filePointer = newFilePointer
-		newFilePointer, err = os.OpenFile(hfile.fileName, os.O_CREATE|os.O_RDWR, os.ModePerm)
-		if err != nil {
-			return nil, err
-		}
-		hfile.filePointer = newFilePointer
-
-		fmt.Println("Files sizes after swapping out data file for clustered index:")
-		fmt.Println("heap  file: ", hfile.fileName, hfile.NumTuples(tid), hfile.NumPages())
-		fmt.Println("index data: ", nnif.dataHeapFile.fileName, nnif.dataHeapFile.NumTuples(tid), nnif.dataHeapFile.NumPages())
 	}
+
+	fmt.Println("Index generation complete.")
+	fmt.Println("Heap file ", hfile.fileName, " has ", hfile.NumTuples(tid), " tuples and ", hfile.NumPages(), "pages.")
+	fmt.Println("Index file ", nnif.dataHeapFile.fileName, " has ", nnif.dataHeapFile.NumTuples(tid), " tuples and ", nnif.dataHeapFile.NumPages(), "pages.")
 
 	hfile.indexes[indexedColName] = nnif
 
-	bp.steal = false
 	return nnif, nil
 }
