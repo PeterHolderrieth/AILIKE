@@ -19,10 +19,9 @@ import (
 // HeapFile is a public class because external callers may wish to instantiate
 // database tables using the method [LoadFromCSV]
 type HeapFile struct {
-	desc        TupleDesc
-	fileName    string
-	filePointer *os.File
-	bufPool     *BufferPool
+	desc     TupleDesc
+	fileName string
+	bufPool  *BufferPool
 	// pageFull is used to memoize which pages are full by mapping pageNos
 	// to whether or not that page is full. The value for pageFull[i] will
 	// default to false until the first time page i is read.
@@ -38,24 +37,23 @@ type HeapFile struct {
 // - bp: the BufferPool that is used to store pages read from the HeapFile
 // May return an error if the file cannot be opened or created.
 func NewHeapFile(fromFile string, td *TupleDesc, bp *BufferPool) (*HeapFile, error) {
-
-	filePointer, err := os.OpenFile(fromFile, os.O_CREATE|os.O_RDWR, os.ModePerm)
-	if err != nil {
-		return nil, err
-	}
-	var pageFull sync.Map
 	indexes := make(map[string]*NNIndexFile) // TODO(tally): populate indexes correctly
-	return &HeapFile{fileName: fromFile, desc: *td.copy(), bufPool: bp, filePointer: filePointer, pageFull: &pageFull, indexes: indexes}, nil
+	return NewHeapFileIndex(fromFile, td, bp, indexes)
 }
 
 func NewHeapFileIndex(fromFile string, td *TupleDesc, bp *BufferPool, indexes map[string]*NNIndexFile) (*HeapFile, error) {
-
-	filePointer, err := os.OpenFile(fromFile, os.O_CREATE|os.O_RDWR, os.ModePerm)
-	if err != nil {
-		return nil, err
-	}
 	var pageFull sync.Map
-	return &HeapFile{fileName: fromFile, desc: *td.copy(), bufPool: bp, filePointer: filePointer, pageFull: &pageFull, indexes: indexes}, nil
+	_, err := os.Stat(fromFile)
+	if os.IsNotExist(err) {
+		file, err := os.Create(fromFile)
+		if err != nil {
+			return nil, GoDBError{OSError, err.Error()}
+		}
+		file.Close()
+	} else if err != nil {
+		return nil, GoDBError{OSError, err.Error()}
+	}
+	return &HeapFile{fileName: fromFile, desc: *td.copy(), bufPool: bp, pageFull: &pageFull, indexes: indexes}, nil
 }
 
 // Return the number of bytes in file
@@ -198,8 +196,16 @@ func (f *HeapFile) readPage(pageNo int) (*Page, error) {
 	}
 
 	pageBytes := make([]byte, PageSize)
-	n, err := f.filePointer.ReadAt(pageBytes, int64(pageNo*PageSize))
+	filePointer, err := os.OpenFile(f.fileName, os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	n, err := filePointer.ReadAt(pageBytes, int64(pageNo*PageSize))
 	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	err = filePointer.Close()
+	if err != nil {
 		return nil, err
 	}
 	hp := newHeapPage(f.Descriptor(), pageNo, f)
@@ -464,7 +470,15 @@ func (f *HeapFile) flushPage(p *Page) error {
 		return err
 	}
 	b := pageBuf.Bytes()
-	_, err = f.filePointer.WriteAt(b, int64(hp.pageNo*PageSize))
+	filePointer, err := os.OpenFile(f.fileName, os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	_, err = filePointer.WriteAt(b, int64(hp.pageNo*PageSize))
+	if err != nil {
+		return err
+	}
+	err = filePointer.Close()
 	if err != nil {
 		return err
 	}
