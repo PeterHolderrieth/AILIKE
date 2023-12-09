@@ -29,6 +29,7 @@ const ABORT_TRANSACTIONS = true
 
 const BLOCK_TIME = 2 * time.Millisecond // time to wait before attempting to acquire a lock again
 const CYCLE_CHECK_INTERVAL = 2          // number of attempts at acquiring a lock before we check for deadlock
+const USE_EVICT_QUEUE = true            // if true, use eviction queue to evict pages. Otherwise, evict pages based on number of empty slots.
 
 const (
 	ReadPerm  RWPerm = iota
@@ -49,6 +50,7 @@ type BufferPool struct {
 	transactionWaitingFor map[TransactionID]Lock          // maps TransactionIDs to the Lock they are waiting for
 	transactionLocks      map[TransactionID]map[Lock]bool // maps TransactionIDs to the Locks they hold or have reserved
 	steal                 bool
+	evictQueue            []BufferPoolKey
 }
 
 // Create a new BufferPool with the specified number of pages
@@ -59,7 +61,8 @@ func NewBufferPool(numPages int) *BufferPool {
 	exclusiveLockMap := make(map[BufferPoolKey]TransactionID, 0)
 	transactionWaitingFor := make(map[TransactionID]Lock, 0)
 	transactionLocks := make(map[TransactionID]map[Lock]bool, 0)
-	return &BufferPool{numPages, pageMap, &mutex, sharedLockMap, exclusiveLockMap, transactionWaitingFor, transactionLocks, false}
+	evictQueue := make([]BufferPoolKey, 0)
+	return &BufferPool{numPages, pageMap, &mutex, sharedLockMap, exclusiveLockMap, transactionWaitingFor, transactionLocks, false, evictQueue}
 }
 
 func (bp *BufferPool) EvictPage() error {
@@ -92,6 +95,23 @@ func (bp *BufferPool) EvictPage() error {
 
 	return GoDBError{BufferPoolFullError, "Cannot evict page; all pages are dirty."}
 
+}
+
+func (bp *BufferPool) EvictPageQueue() error {
+	// Evict page using eviction queue
+	for i, evictK := range bp.evictQueue {
+		var evictP Page = bp.pageMap[evictK]
+		if !evictP.isDirty() || bp.steal {
+			err := evictP.flushPage()
+			if err != nil {
+				return err
+			}
+			delete(bp.pageMap, evictK)
+			bp.evictQueue = append(bp.evictQueue[:i], bp.evictQueue[i+1:]...)
+			return nil
+		}
+	}
+	return GoDBError{BufferPoolFullError, "Cannot evict page; all pages are dirty."}
 }
 
 // Testing method -- iterate through all pages in the buffer pool
@@ -383,12 +403,17 @@ func (bp *BufferPool) GetPage(file DBFile, pageNo int, tid TransactionID, perm R
 	}
 
 	if len(bp.pageMap) == bp.numPages {
-		if err := bp.EvictPage(); err != nil {
+		evictMethod := bp.EvictPage
+		if USE_EVICT_QUEUE {
+			evictMethod = bp.EvictPageQueue
+		}
+		if err := evictMethod(); err != nil {
 			return nil, err
 		}
 	}
 
 	bp.pageMap[pageKey] = *page
+	bp.evictQueue = append(bp.evictQueue, pageKey)
 	return page, nil
 }
 
