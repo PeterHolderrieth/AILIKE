@@ -2,9 +2,12 @@ package godb
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"testing"
 )
+
+var warmup_iter = 0
 
 func TestBenchmarkingInfra(t *testing.T) {
 	var config = BenchMetaData{
@@ -20,62 +23,66 @@ func TestBenchmarkingInfra(t *testing.T) {
 	fmt.Println("Time taken = ", time)
 }
 
+// Benchmarking Functions
 type fn (func(string) string)
 
-func speedup_vary_db_size(tables []string, catalog string, path string, query_gen fn) {
-	for _, table := range tables {
-		var config = newBenchMetaData(catalog, path, 1000,
-			"./benchmark_results/var_db_size", true)
-		time, err := BenchmarkingInfra(table, query_gen(table), config)
-		if err == nil {
-		}
-		fmt.Println("Time taken for ", table, "=", time)
+func varyTableOnly(tables []string, catalog string, path string, query_gen []fn, dataDir string) {
+
+	timing_csv_path := dataDir + "times.csv"
+	timing_csv, err := os.OpenFile(timing_csv_path, os.O_RDWR|os.O_CREATE, 0644)
+
+	if err != nil {
+		fmt.Println("Failed to create out file, exiting...")
+		return
 	}
-	return
+	for _, table := range tables {
+		time := int64(0)
+		for _, queries := range query_gen {
+			var config = newBenchMetaData(catalog, path, 1000,
+				dataDir, true, warmup_iter)
+			fmt.Println("Starting ", table, " with ", queries(table))
+			time_taken, err := BenchmarkingInfra(table, queries(table), config)
+			if err != nil {
+				fmt.Println("Failed to run ", queries(table))
+			}
+			fmt.Println("Done!")
+			time += time_taken
+		}
+		fmt.Println("Time taken for ", table, " = ", time/int64(len(query_gen)))
+		fmt.Fprintf(timing_csv, "%s, %v\n", table, time/int64(len(query_gen)))
+	}
+	timing_csv.Close()
 }
 
-func speedup_vary_num_cluster(tables []string, catalog string, path string, query_gen fn) {
-	for _, table := range tables {
-		var config = newBenchMetaData(catalog, path, 1000,
-			"./benchmark_results/var_num_cluster", true)
-		time, err := BenchmarkingInfra(table, query_gen(table), config)
-		if err == nil {
-		}
-		fmt.Println("Time taken for ", table, "=", time)
+func query_gen(sim_string string, num int) func(string) string {
+	lambda := func(table string) string {
+		return "select tweet_id, (content ailike '" + sim_string + "') sim from " + table + " order by sim desc, tweet_id limit " + strconv.Itoa(num)
 	}
-	return
+	return lambda
 }
 
-func query_gen_1(table string) string {
-	return "select sentiment, content, (content ailike 'the migration patterns of professor hair') sim from " + table + " order by sim desc, sentiment limit 5;"
+func query_gen_agg(sim_string string) func(string) string {
+	lambda := func(table string) string {
+		return "select max(tweet_id), max(content ailike '" + sim_string + "') from " + table + ";"
+	}
+	return lambda
 }
 
 func TestVaryDBSize(t *testing.T) {
 	catalog := "tweets_384.catalog"
 	catalog_path := "/Users/manyab/AILIKE/data/tweets/tweets_384"
-	tables := []string{"tweets", "tweets_2500",
-		"tweets_5000", "tweets_10000", "tweets_20000",
+	tables := []string{
+		// "tweets", "tweets_2500",
+		// "tweets_5000", "tweets_10000", "tweets_20000",
 		"tweets_c_250", "tweets_2500_c_16", "tweets_5000_c_31",
 		"tweets_10000_c_62", "tweets_20000_c_125",
 	}
-	speedup_vary_db_size(tables, catalog, catalog_path, query_gen_1);
-	return
-}
-
-func query_gen_2(table string) string {
-	return "select max(content ailike 'I am feeling really tired') from " + table + ";"
-}
-
-func speedup_vary_second_query(tables []string, catalog string, path string, query_gen fn) {
-	for _, table := range tables {
-		var config = newBenchMetaData(catalog, path, 1000,
-			"./benchmark_results/var_agg_query", true)
-		time, err := BenchmarkingInfra(table, query_gen(table), config)
-		if err == nil {
-		}
-		fmt.Println("Time taken for ", table, "=", time)
-	}
-	return
+	varyTableOnly(tables, catalog, catalog_path,
+		[]fn{query_gen_agg("the migration patterns of professor hair"),
+			query_gen("the migration patterns of professor hair", 5),
+			query_gen_agg("I am so happy"),
+			query_gen("I am so happy", 5)},
+		"./benchmark_results/var_db_size")
 }
 
 func TestVaryNewQuery(t *testing.T) {
@@ -86,73 +93,123 @@ func TestVaryNewQuery(t *testing.T) {
 		"tweets_c_250", "tweets_2500_c_16", "tweets_5000_c_31",
 		"tweets_10000_c_62", "tweets_20000_c_125",
 	}
-	speedup_vary_second_query(tables, catalog, catalog_path, query_gen_2);
-	return
+	varyTableOnly(tables, catalog, catalog_path,
+		[]fn{query_gen_agg("the migration patterns of professor hair"),
+			query_gen_agg("I am so happy"),
+			query_gen_agg("I want to do to the doctor"),
+			query_gen_agg("I am a grad student")},
+		"./benchmark_results/var_agg_query")
 }
 
 func TestVaryNumCluster(t *testing.T) {
 	catalog := "tweets_384.catalog"
 	catalog_path := "/Users/manyab/AILIKE/data/tweets/tweets_384"
 	tables := []string{"tweets", "tweets_c_50",
-	  "tweets_c_100", "tweets_c_250",
+		"tweets_c_100", "tweets_c_250",
 		"tweets_c_500",
 	}
-	speedup_vary_num_cluster(tables, catalog, catalog_path, query_gen_1);
-	return
+	varyTableOnly(tables, catalog, catalog_path,
+		[]fn{query_gen("the migration patterns of professor hair", 1),
+			query_gen("the migration patterns of professor hair", 5),
+			query_gen("the migration patterns of professor hair", 10)},
+		"./benchmark_results/var_num_cluster")
 }
 
-func speedup_vary_n(tables []string, N []int, catalog string, path string, query_gen (func(string, int) string)) {
+
+type fn_n (func(string, int) string)
+
+func varyTableAndN(tables []string, N []int, catalog string, path string, query_gen []fn_n, dataDir string) {
+
+	timing_csv_path := dataDir + "times.csv"
+	timing_csv, err := os.OpenFile(timing_csv_path, os.O_RDWR|os.O_CREATE, 0644)
+
+	if err != nil {
+		fmt.Println("Failed to create out file, exiting...")
+		return
+	}
+
 	for _, table := range tables {
+		time := int64(0)
 		for _, n := range N {
-		var config = newBenchMetaData(catalog, path, 1000,
-			"./benchmark_results/var_n", true)
-		time, err := BenchmarkingInfra(table + "_" + strconv.Itoa(n), query_gen(table, n), config)
-		if err == nil {
-		}
-		fmt.Println("Time taken for ", table, " with ", n, "=", time)
+			for i, queries := range query_gen {
+				var config = newBenchMetaData(catalog, path, 1000,
+					dataDir, true, warmup_iter)
+				time_taken, err := BenchmarkingInfra(table+"_"+strconv.Itoa(n)+"_"+strconv.Itoa(i), queries(table, n), config)
+				if err != nil {
+					fmt.Println("Failed to run ", queries(table, n))
+				}
+				time += time_taken
+			}
+			fmt.Println("Time taken for ", table, " = ", time/int64(len(query_gen)))
+			fmt.Fprintf(timing_csv, "%s, %v\n", table+"_"+strconv.Itoa(n), time/int64(len(query_gen)))
 		}
 	}
-	return
+	timing_csv.Close()
 }
 
-func query_gen_n(table string, n int) string {
-	return "select sentiment, content, (content ailike 'the migration patterns of professor hair') sim from " + table + " order by sim desc, sentiment limit " + strconv.Itoa(n) + ";"
+func query_gen_limit(sim_string string) fn_n {
+		lambda := func(table string, limit int) string {
+			return "select tweet_id, content, (content ailike '" + sim_string + "') sim from " + table + " order by sim desc, tweet_id limit " + strconv.Itoa(limit)
+		}
+		return lambda
 }
 
 func TestVaryLimit(t *testing.T) {
 	catalog := "tweets_384.catalog"
 	catalog_path := "/Users/manyab/AILIKE/data/tweets/tweets_384"
-	tables := []string{"tweets", "tweets_c_250"}
-	N := []int{2, 4, 8, 32, 64, 128, 256};
-	speedup_vary_n(tables, N, catalog, catalog_path, query_gen_n);
-	return
+	tables := []string{"tweets", "tweets_c_50",
+		"tweets_c_100", "tweets_c_250",
+		"tweets_c_500",
+	}
+	N := []int{2, 4, 8, 32, 64}
+	varyTableAndN(tables, N, catalog, catalog_path,
+		[]fn_n{query_gen_limit("the migration patterns of professor hair"),
+		query_gen_limit("the migration patterns of professor hair"),
+		query_gen_limit("the migration patterns of professor hair")},
+		"./benchmark_results/var_n")
 }
 
-func speedup_vary_probe(tables []string, N []int, catalog string, path string, query_gen fn) {
+func varyTableAndProbe(tables []string, N []int, catalog string, path string, query_gen []fn, dataDir string) {
+
+	timing_csv_path := dataDir + "times.csv"
+	timing_csv, err := os.OpenFile(timing_csv_path, os.O_RDWR|os.O_CREATE, 0644)
+
+	if err != nil {
+		fmt.Println("Failed to create out file, exiting...")
+		return
+	}
+
 	for _, table := range tables {
+		time := int64(0)
 		for _, n := range N {
-		var config = newBenchMetaData(catalog, path, 1000,
-			"./benchmark_results/var_probe", true)
-		DefaultProbe = n + 10;
-		time, err := BenchmarkingInfra(table + "_" + strconv.Itoa(n), query_gen(table), config)
-		if err != nil {
-			fmt.Println("Failed for ", table , " with probe = ", n)
-			continue
-		}
-		fmt.Println("Time taken for ", table, " with ", n, "=", time)
+			for i, queries := range query_gen {
+				var config = newBenchMetaData(catalog, path, 1000,
+					dataDir, true, warmup_iter)
+				DefaultProbe = n + 10
+				time_taken, err := BenchmarkingInfra(table+"_"+strconv.Itoa(n)+"_"+strconv.Itoa(i), queries(table), config)
+				if err != nil {
+					fmt.Println("Failed to run ", queries(table))
+				}
+				time += time_taken
+			}
+			fmt.Println("Time taken for ", table, " = ", time/int64(len(query_gen)))
+			fmt.Fprintf(timing_csv, "%s, %v\n", table+"_"+strconv.Itoa(n), time/int64(len(query_gen)))
 		}
 	}
-}
-
-func query_gen_probe(table string) string {
-	return "select sentiment, content, (content ailike 'the migration patterns of professor hair') sim from " + table + " order by sim desc, sentiment limit 40;"
+	timing_csv.Close()
 }
 
 func TestDefaultProbe(t *testing.T) {
 	catalog := "tweets_384.catalog"
 	catalog_path := "/Users/manyab/AILIKE/data/tweets/tweets_384"
-	tables := []string{"tweets", "tweets_c_250"}
-	N := []int{1, 2, 3, 4, 5, 6, 7};
-	speedup_vary_probe(tables, N, catalog, catalog_path, query_gen_probe);
-	return
+	tables := []string{"tweets", "tweets_c_50",
+		"tweets_c_100", "tweets_c_250",
+		"tweets_c_500",
+	}
+	N := []int{1, 2, 3, 4}
+	varyTableAndProbe(tables, N, catalog, catalog_path,
+		[]fn{query_gen("the migration patterns of professor hair", 1),
+		query_gen("the migration patterns of professor hair", 5),
+		query_gen("the migration patterns of professor hair", 10)},
+		"./benchmark_results/var_probe")
 }

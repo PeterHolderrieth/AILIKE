@@ -12,17 +12,18 @@ type BenchMetaData struct {
 	bpSize    int
 	outputDir string // name of the dir to output results
 	save      bool   // whether to save the query results and timing results
+	warmup    int
 }
 
-func newBenchMetaData(catalog string, dbDir string, bpSize int, outputDir string, save bool) BenchMetaData {
-	return BenchMetaData{catalog: catalog, dbDir: dbDir, bpSize: bpSize, outputDir: outputDir, save: save}
+func newBenchMetaData(catalog string, dbDir string, bpSize int, outputDir string, save bool, warmup int) BenchMetaData {
+	return BenchMetaData{catalog: catalog, dbDir: dbDir, bpSize: bpSize, outputDir: outputDir, save: save, warmup: warmup}
 }
 
 // BenchmarkingInfra runs a query and:
 //   - saves the results in a file titled by queryName
 //   - saves the time taken to run the query
 //   - returns the time taken to run the query
-func BenchmarkingInfra(queryName string, query string, config BenchMetaData) (int64, error) {
+func _BenchmarkingInfra(queryName string, query string, config BenchMetaData) (int64, error) {
 	bp := NewBufferPool(config.bpSize)
 	c, err := NewCatalogFromFile(config.catalog, bp, config.dbDir)
 	if err != nil {
@@ -42,19 +43,16 @@ func BenchmarkingInfra(queryName string, query string, config BenchMetaData) (in
 	if desc == nil {
 		return 0, GoDBError{ParseError, "Descriptor was nil"}
 	}
+
 	tid := NewTID()
 	iter, err := plan.Iterator(tid)
 	if err != nil {
 		return 0, err
 	}
-
-	// Run once to collect timing information
+	// Now actually collect the times!
 	start := time.Now()
 	for {
 		tup, err := iter()
-
-		// Comment out this check while actually
-		// benchmarking, here right now for debugging help
 		if err != nil {
 			return 0, err
 		}
@@ -64,19 +62,8 @@ func BenchmarkingInfra(queryName string, query string, config BenchMetaData) (in
 	}
 	end := time.Since(start)
 
-	// Now save output
-	timing_csv_path := config.outputDir + "/" + "ALL_TIMINGS.csv"
-	if queryName == "ALL_TIMINGS" {
-		panic("Query name cannot be ALL_TIMINGS.")
-	}
 	output_csv_path := config.outputDir + "/" + queryName + ".csv"
 	if config.save {
-		timing_csv, err := os.OpenFile(timing_csv_path, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0644)
-		if err != nil {
-			return 0, GoDBError{OSError, err.Error()}
-		}
-		fmt.Fprintf(timing_csv, "%s, %v\n", queryName, end.Milliseconds())
-
 		outfile_csv, err := os.OpenFile(output_csv_path, os.O_RDWR|os.O_CREATE, 0644)
 		if err != nil {
 			return 0, GoDBError{OSError, err.Error()}
@@ -94,9 +81,23 @@ func BenchmarkingInfra(queryName string, query string, config BenchMetaData) (in
 			if tup == nil {
 				break
 			}
-			fmt.Fprintf(outfile_csv, "%s\n", tup.Fields[1].(EmbeddedStringField).Value)
+			fmt.Fprintf(outfile_csv, "%d\n", tup.Fields[0].(IntField).Value)
 		}
 	}
 
 	return end.Milliseconds(), nil
+}
+
+func BenchmarkingInfra(queryName string, query string, config BenchMetaData) (int64, error) {
+
+	config.save = false
+	for i := 0; i < config.warmup; i++ {
+		_BenchmarkingInfra(queryName, query, config)
+		// Add this print to make sure we are making progress!
+		fmt.Println("#iter = ", i)
+	}
+	config.save = true
+	fmt.Println("Timing now!")
+	return _BenchmarkingInfra(queryName, query, config)
+
 }
