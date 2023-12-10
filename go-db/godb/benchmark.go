@@ -81,7 +81,7 @@ func _BenchmarkingInfra(queryName string, query string, config BenchMetaData) (i
 			if tup == nil {
 				break
 			}
-			fmt.Fprintf(outfile_csv, "%d\n", tup.Fields[0].(IntField).Value)
+			fmt.Fprintf(outfile_csv, "%s\n", tup.Fields[1].(EmbeddedStringField).Value)
 		}
 	}
 
@@ -90,13 +90,14 @@ func _BenchmarkingInfra(queryName string, query string, config BenchMetaData) (i
 
 func BenchmarkingInfra(queryName string, query string, config BenchMetaData) (int64, error) {
 
+	original_state := config.save
 	config.save = false
 	for i := 0; i < config.warmup; i++ {
 		_BenchmarkingInfra(queryName, query, config)
 		// Add this print to make sure we are making progress!
 		fmt.Println("#iter = ", i)
 	}
-	config.save = true
+config.save = original_state
 	fmt.Println("Timing now!")
 	return _BenchmarkingInfra(queryName, query, config)
 

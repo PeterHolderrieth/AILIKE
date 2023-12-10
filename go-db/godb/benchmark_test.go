@@ -39,7 +39,7 @@ func varyTableOnly(tables []string, catalog string, path string, query_gen []fn,
 		time := int64(0)
 		for _, queries := range query_gen {
 			var config = newBenchMetaData(catalog, path, 1000,
-				dataDir, true, warmup_iter)
+				dataDir, false, warmup_iter)
 			fmt.Println("Starting ", table, " with ", queries(table))
 			time_taken, err := BenchmarkingInfra(table, queries(table), config)
 			if err != nil {
@@ -56,7 +56,7 @@ func varyTableOnly(tables []string, catalog string, path string, query_gen []fn,
 
 func query_gen(sim_string string, num int) func(string) string {
 	lambda := func(table string) string {
-		return "select tweet_id, (content ailike '" + sim_string + "') sim from " + table + " order by sim desc, tweet_id limit " + strconv.Itoa(num)
+		return "select tweet_id, content, (content ailike '" + sim_string + "') sim from " + table + " order by sim desc, tweet_id limit " + strconv.Itoa(num)
 	}
 	return lambda
 }
