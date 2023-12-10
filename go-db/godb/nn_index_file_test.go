@@ -1,7 +1,6 @@
 package godb
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -44,7 +43,6 @@ func TestConstructIndexClustered(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	tid := NewTID()
-	fmt.Println("test heap file original: ", hfile.fileName, hfile.NumTuples(tid), hfile.NumPages())
 
 	var numClusters int = 10
 	ifile, err := ConstructNNIndexFileFromHeapFile(hfile, "content", numClusters, true, ".", "tweets_test", bp)
@@ -66,11 +64,6 @@ func TestConstructIndexClustered(t *testing.T) {
 	for t, _ := iter(); t != nil; t, _ = iter() {
 		dataCount++
 	}
-	fmt.Println(bp.steal)
-	fmt.Println("test heap  file: ", hfile.fileName, hfile.NumTuples(tid), hfile.NumPages())
-	fmt.Println("test index data: ", ifile.dataHeapFile.fileName, ifile.dataHeapFile.NumTuples(tid), ifile.dataHeapFile.NumPages())
-	fmt.Println("test heap  file: ", hfile.fileName, hfile.NumTuples(tid), hfile.NumPages())
-	fmt.Println("test index data: ", ifile.dataHeapFile.fileName, ifile.dataHeapFile.NumTuples(tid), ifile.dataHeapFile.NumPages())
 	if dataCount != num_records {
 		t.Fatalf("expected %d records, got %d", num_records, dataCount)
 	}
