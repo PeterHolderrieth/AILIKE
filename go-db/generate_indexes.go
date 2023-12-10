@@ -6,11 +6,11 @@ import (
 	"github.com/srmadden/godb"
 )
 
-func generate_indexpath(c *godb.Catalog, table string, column string, clusters int, path string) {
+func generate_indexpath(c *godb.Catalog, table string, column string, clusters int, path string, clustured bool) {
 	bp := godb.NewBufferPool(1000)
 	hf, err := c.GetTable(table)
 	fmt.Println("Generating index for ", table)
-	_, err = godb.ConstructNNIndexFileFromHeapFile(hf.(*godb.HeapFile), column, clusters, false,
+	_, err = godb.ConstructNNIndexFileFromHeapFile(hf.(*godb.HeapFile), column, clusters, clustured,
 		path, table, bp)
 
 	if err != nil {
@@ -28,13 +28,19 @@ func main() {
 		return
 	}
 	dbDir := "../data/tweets/tweets_384/"
-	generate_indexpath(c, "tweets_c_50", "content", 50, dbDir)
-	generate_indexpath(c, "tweets_c_250", "content", 250, dbDir)
-	generate_indexpath(c, "tweets_c_100", "content", 100, dbDir)
-	generate_indexpath(c, "tweets_c_500", "content", 500, dbDir)
-	generate_indexpath(c, "tweets_2500_c_16", "content", 16, dbDir)
-	generate_indexpath(c, "tweets_5000_c_31", "content", 31, dbDir)
-	generate_indexpath(c, "tweets_10000_c_62", "content", 62, dbDir)
-	generate_indexpath(c, "tweets_20000_c_125", "content", 125, dbDir)
+	generate_indexpath(c, "tweets_c_200", "content", 250, dbDir, false)
+	generate_indexpath(c, "tweets_c_100", "content", 100, dbDir, false)
+	generate_indexpath(c, "tweets_c_80", "content", 100, dbDir, false)
+	generate_indexpath(c, "tweets_c_40", "content", 100, dbDir, false)
+	generate_indexpath(c, "tweets_2500_c_5", "content", 16, dbDir, false)
+	generate_indexpath(c, "tweets_5000_c_10", "content", 31, dbDir, false)
+	generate_indexpath(c, "tweets_10000_c_20", "content", 62, dbDir, false)
+	generate_indexpath(c, "tweets_20000_c_40", "content", 125, dbDir, false)
+
+
+	generate_indexpath(c, "clustered_tweets_c_200", "content", 250, dbDir, true)
+	generate_indexpath(c, "clustered_tweets_c_100", "content", 100, dbDir, true)
+	generate_indexpath(c, "clustered_tweets_c_80", "content", 100, dbDir, true)
+	generate_indexpath(c, "clustered_tweets_c_40", "content", 100, dbDir, true)
 	return
 }
