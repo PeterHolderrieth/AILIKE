@@ -29,9 +29,9 @@ var mappingDesc = TupleDesc{Fields: []FieldType{
 
 // NNIndexFile provides a nearest-neighbor index for a given table stored within a HeapFile.
 type NNIndexFile struct {
-	tableFileName  string // the filename of the table this is an index for
-	indexedColName string // the name of the column being indexed; must be EmbeddedString column
-	clustered      bool   // whether or not this index is clustered
+	sourceTableFilename string // the filename of the table this is an index for
+	indexedColName      string // the name of the column being indexed; must be EmbeddedString column
+	clustered           bool   // whether or not this index is clustered
 	// We use a heapFile to store the vector <-> heapRecordId mappings
 	dataHeapFile *HeapFile
 	// We use another heap file to store centroid <-> centroidID mappings
@@ -59,7 +59,7 @@ func (f *NNIndexFile) ApproximateNumTuples() int {
 // - fromCentroidFile: the backing file for this index that stores the centroid <-> pageNo mapping
 // - bp: the BufferPool that is used to store pages read from this index
 // May return an error if the file cannot be opened or created.
-func NewNNIndexFileFile(tableFileName string, indexedColName string, clusteredDataDesc *TupleDesc, fromDataFile string, fromCentroidFile string, fromMappingFile string, bp *BufferPool) (*NNIndexFile, error) {
+func NewNNIndexFileFile(sourceTableFilename string, indexedColName string, clusteredDataDesc *TupleDesc, fromDataFile string, fromCentroidFile string, fromMappingFile string, bp *BufferPool) (*NNIndexFile, error) {
 	clustered := clusteredDataDesc != nil
 	indexDataDesc := &dataDesc
 	if clustered {
@@ -77,7 +77,7 @@ func NewNNIndexFileFile(tableFileName string, indexedColName string, clusteredDa
 	if err != nil {
 		return nil, err
 	}
-	return &NNIndexFile{tableFileName, indexedColName, clustered, dataHeapFile, centroidHeapFile, mappingHeapFile}, nil
+	return &NNIndexFile{sourceTableFilename, indexedColName, clustered, dataHeapFile, centroidHeapFile, mappingHeapFile}, nil
 }
 
 // Given an embedding, return an iterator that returns the [centroidId, pageNo] pairs ordered by distance between the centroid
@@ -142,10 +142,10 @@ func (f *NNIndexFile) getCentroidPageNoIterator(e EmbeddedStringField, ascending
 
 // Finds a page for the nearest centroid with room for a new record, or creates a new page for that centroid if needed
 func (f *NNIndexFile) insertTuple(t *Tuple, tid TransactionID) error {
-	if t.Rid.(heapRecordId).fileName != f.tableFileName {
+	if t.Rid.(heapRecordId).fileName != f.sourceTableFilename {
 		return GoDBError{IncompatibleTypesError, "Index does not match table of tuple."}
 	}
-	colIndex, err := findFieldInTd(FieldType{Fname: f.indexedColName, TableQualifier: f.tableFileName, Ftype: EmbeddedStringType},
+	colIndex, err := findFieldInTd(FieldType{Fname: f.indexedColName, TableQualifier: f.sourceTableFilename, Ftype: EmbeddedStringType},
 		&t.Desc)
 	if err != nil {
 		return GoDBError{IncompatibleTypesError, "Given tuple does not contain indexed column."}
