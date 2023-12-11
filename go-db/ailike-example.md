@@ -1,5 +1,4 @@
-# Running an AILIKE example
-
+# Running AILIKE
 
 ## Step 1: Update to the new parser
 In the `go-db` run: 
@@ -25,31 +24,51 @@ In the `go-db` folder run:
 
 - `go run main.go`
 
-## Step 3: Load the data
+At this point, you will be able to start making ailike queries! You can skip to Step 4 if you already have data loaded.
 
-If using random projections, load the data by running:
-```
-\c ../data/tweets/tweets_32/tweets_32.catalog
-```
+## Step 3 (Optional): Load the data
+You can use the \c command to load in a particular catalog. By default, GoDB will load in the tweets data catalog that matches the current embedding dimension configured in types.go.
 
-If using the full embeddings, load the data by running:
+You can load in a particular catalog by doing:
 ```
-\c ../data/tweets/tweets_768/tweets_768.catalog
+\c ../data/tweets/tweets_384/tweets_384.catalog
 ```
 
-To create an index for a table, use (make sure that have loaded the data first!):
+You can load data from a CSV into a table by doing:
+```
+\l tweets_mini ../data/tweets/tweets_mini.csv
+\l tweets ../data/tweets/tweets.csv
+```
+
+NOTE: When loading data, you need to make sure the db configurable variables (TextEmbeddingDim and PageSize) match the parameters that were used to generate the .dat files. Furthermore, you need to make sure that the dimension of the vector within embeddings.py matches that of GoDB. You may need to restart the python server if they do not match.
+
+
+After loading data into a table, you can create an index for the table using:
 ```
 \i tabele col_name num_clusters index_type path/to/file; values for index_type are clustered and secondary
 ```
-example: `\i tweets_test_clustered content 5 clustered ../data/tweets/tweets_384`
 
-NOTE: When loading data, you need to make sure the db configurable variables (UseRandomProj and PageSize) match the parameters that were used to generate the .dat files. Furthermore, you need to make sure that the value of RANDOM_PROJ within embedding.py matches that of UseRandomProj. You may need to restart the python server if they do not match.
+NOTE: Make sure col_name is an EmbeddedStringField.
+
+examples:
+```
+\i tweets_clustered content 80 clustered ../data/tweets/tweets_384
+\i tweets content 80 secondary ../data/tweets/tweets_384
+\i tweets_mini_clustered content 10 clustered ../data/tweets/tweets_384
+\i tweets_mini content 10 secondary ../data/tweets/tweets_384
+```
 
 ## Step 4
 Perform queries! Examples: 
 
 - With a string literal: `select tweet_id, sentiment, (content ailike 'test string') sim from tweets_mini order by sim limit 5;`
 - With a coloumn: `select tweet_id, sentiment, (content ailike content) sim from tweets_mini order by sim limit 5;`
+
+You can use 'explain' to see the query plans. For example, you can compare the following:
+explain select content, (content ailike 'hair migration patterns of professors') dist from tweets_mini order by dist limit 2;
+explain select content, (content ailike 'hair migration patterns of professors') dist from tweets_mini_noindex order by dist limit 2;
+explain select content, (content ailike 'hair migration patterns of professors') dist from tweets_mini_clustered order by dist limit 2;
+
 
 Examples that should use index:
 select tweet_id, sentiment, content, (content ailike 'hair migration patterns of professors') dist from tweets_mini order by dist limit 2;
@@ -69,4 +88,3 @@ select max(content ailike 'I am feeling really tired'), min(content ailike 'I am
 
 How to count numbers of pages per cluster:
 select centroidid, count(indexpageno) from secondary__tweets_mini__content__mapping group by centroidid;
-select tweet_id, sentiment, content, (content ailike 'hair migration patterns of professors') dist from tweets order by dist limit 5;
