@@ -32,12 +32,12 @@ func TestConstructWikiHeapFile(t *testing.T) {
 	}
 }
 
-const recreateWiki = false
+const recreateWiki = true
 
 func TestConstructFullWikiHeapFile(t *testing.T) {
 	if recreateWiki {
 		bp := NewBufferPool(100)
-		hfile, err := ConstructWikiHeapFile("wiki_full", bp, true, 6458665)
+		hfile, err := ConstructWikiHeapFile("wiki_full", bp, true, 1000000)
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
