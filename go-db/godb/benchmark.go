@@ -94,10 +94,10 @@ func BenchmarkingInfra(queryName string, query string, config BenchMetaData) (in
 	config.save = false
 	for i := 0; i < config.warmup; i++ {
 		_BenchmarkingInfra(queryName, query, config)
-		// Add this print to make sure we are making progress!
+		// Adding this print to make sure we are making progress!
 		fmt.Println("#iter = ", i)
 	}
-config.save = original_state
+  config.save = original_state
 	fmt.Println("Timing now!")
 	return _BenchmarkingInfra(queryName, query, config)
 

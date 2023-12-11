@@ -29,7 +29,7 @@ const ABORT_TRANSACTIONS = true
 
 const BLOCK_TIME = 2 * time.Millisecond // time to wait before attempting to acquire a lock again
 const CYCLE_CHECK_INTERVAL = 2          // number of attempts at acquiring a lock before we check for deadlock
-var USE_EVICT_QUEUE = false           // if true, use eviction queue to evict pages. Otherwise, evict pages based on number of empty slots.
+var USE_EVICT_QUEUE = true           // if true, use eviction queue to evict pages. Otherwise, evict pages based on number of empty slots.
 
 const (
 	ReadPerm  RWPerm = iota
