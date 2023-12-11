@@ -32,7 +32,7 @@ func TestConstructWikiHeapFile(t *testing.T) {
 	}
 }
 
-const recreateWiki = false
+const recreateWiki = true
 
 func TestConstructFullWikiHeapFile(t *testing.T) {
 	if recreateWiki {

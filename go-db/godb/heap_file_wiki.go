@@ -127,7 +127,7 @@ func getWikiElement(idx_query int) (*WikiResponse, error) {
 	}
 
 	// Send a POST request to the Python server
-	resp, err := http.Post("http://localhost:"+fmt.Sprint(portNumberWiki)+"/dataitem", "application/json",
+	resp, err := http.Post("http://0.0.0.0:"+fmt.Sprint(portNumberWiki)+"/dataitem", "application/json",
 		bytes.NewBuffer(jsonData))
 	if err != nil {
 		fmt.Println("Error sending HTTP request:", err)

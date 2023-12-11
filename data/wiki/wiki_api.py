@@ -24,10 +24,16 @@ from transformers import AutoTokenizer, AutoModel
 import numpy as np
 import warnings
 import pickle
+import datasets
+from datasets import load_dataset
+from pathlib import Path
+import os
+
+datasets.config.DOWNLOADED_DATASETS_PATH = Path(os.getcwd())
 
 #Make script deterministic:
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-dataset = load_dataset('wikipedia', "20220301.en", split='train')
+dataset = load_dataset('wikipedia', "20220301.en", cache_dir='./')['train']
 
 def process_dataitem_to_godb(data_item: dict, char_length: int):
     chop_length = min(len(data_item['text']),char_length)
