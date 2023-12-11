@@ -248,6 +248,8 @@ func ConstructNNIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nC
 	mappingFileName := fmt.Sprintf("%s/%s__%s__%s__mapping.dat", dbPath, indexType, tableName, indexedColName)
 
 	tid := NewTID()
+	
+	fmt.Println("************STARTING clustering*******************")
 
 	//Create clustering
 	getterFunc := GetEmbeddingGetterFunc(indexedColName)
@@ -257,6 +259,8 @@ func ConstructNNIndexFileFromHeapFile(hfile *HeapFile, indexedColName string, nC
 		return nil, err
 	}
 
+        fmt.Println("************END clustering*******************")
+	
 	//Create data file
 	os.Remove(dataFileName)
 	indexDataDesc := &dataDesc
