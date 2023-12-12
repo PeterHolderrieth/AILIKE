@@ -83,12 +83,8 @@ func main() {
 	//catName := "tpch-catalog.sql"
 	//catPath := "godb/tpch-dbgen"
 
-	catName := "tweets_384.catalog"
-	catPath := "../data/tweets/tweets_384/"
-	if godb.UseRandomProj {
-		catName = "tweets_32.catalog"
-		catPath = "../data/tweets/tweets_32/"
-	}
+	catName := fmt.Sprintf("tweets_%v.catalog", godb.TextEmbeddingDim)
+	catPath := fmt.Sprintf("../data/tweets/tweets_%v/", godb.TextEmbeddingDim)
 
 	c, err := godb.NewCatalogFromFile(catName, bp, catPath)
 	if err != nil {

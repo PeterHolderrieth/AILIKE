@@ -51,25 +51,13 @@ const (
 
 var (
 	// The following are configurable.
-	UseRandomProj bool = false
-	PageSize      int  = 8192
+	TextEmbeddingDim int = 384
+	PageSize         int = 8192
 
 	// the following will change based on configurable variables
-	TextEmbeddingDim   int = 384
 	EmbeddingSizeBytes int = TextEmbeddingDim * FloatSizeBytes
 	TextSizeBytes      int = EmbeddingSizeBytes + TextCharLength
 )
-
-// Currently unused; TODO: call this function when updating the config
-func updateConfigurationVariables() {
-	if UseRandomProj {
-		TextEmbeddingDim = 32
-	} else {
-		TextEmbeddingDim = 384
-	}
-	EmbeddingSizeBytes = TextEmbeddingDim * FloatSizeBytes
-	TextSizeBytes = EmbeddingSizeBytes + TextCharLength
-}
 
 type Page interface {
 	//these methods are used by buffer pool to
