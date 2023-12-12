@@ -34,7 +34,7 @@ func TestConstructWikiHeapFile(t *testing.T) {
 
 const recreateRandomWiki = true
 const recreateWiki = false
-const limitRandomWiki = 10000
+const limitRandomWiki = 100000
 
 var fileNameRandomWiki string = fmt.Sprintf("wiki_random_%d", limitRandomWiki)
 
