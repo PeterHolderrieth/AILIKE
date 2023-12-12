@@ -14,7 +14,7 @@ func TestGetWikiElement(t *testing.T) {
 }
 func TestConstructWikiHeapFile(t *testing.T) {
 	bp := NewBufferPool(100)
-	hfile, err := ConstructWikiHeapFile("test_wiki", bp, true, 10)
+	hfile, err := ConstructWikiHeapFile("test_wiki", bp, true, 10, false)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -32,12 +32,27 @@ func TestConstructWikiHeapFile(t *testing.T) {
 	}
 }
 
-const recreateWiki = true
+const recreateRandomWiki = true
+const recreateWiki = false
+const limitRandomWiki = 10000
+
+var fileNameRandomWiki string = fmt.Sprintf("wiki_random_%d", limitRandomWiki)
+
+func TestConstructRandomWikiHeapFile(t *testing.T) {
+	if recreateRandomWiki {
+		bp := NewBufferPool(100)
+		hfile, err := ConstructWikiHeapFile(fileNameRandomWiki, bp, true, limitRandomWiki, true)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		fmt.Println("Number of tuples in heap file: ", hfile.ApproximateNumTuples())
+	}
+}
 
 func TestConstructFullWikiHeapFile(t *testing.T) {
 	if recreateWiki {
 		bp := NewBufferPool(100)
-		hfile, err := ConstructWikiHeapFile("wiki_full", bp, true, 1000000)
+		hfile, err := ConstructWikiHeapFile("wiki_full", bp, true, 1000000, true)
 		if err != nil {
 			t.Fatalf(err.Error())
 		}

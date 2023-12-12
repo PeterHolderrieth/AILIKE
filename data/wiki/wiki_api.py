@@ -29,11 +29,13 @@ from datasets import load_dataset
 from pathlib import Path
 import os
 
-datasets.config.DOWNLOADED_DATASETS_PATH = Path(os.getcwd())
+#datasets.config.DOWNLOADED_DATASETS_PATH = Path(os.getcwd())
 
 #Make script deterministic:
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-dataset = load_dataset('wikipedia', "20220301.en", cache_dir='./')['train']
+#dataset = load_dataset('wikipedia', "20220301.en", cache_dir='./')['train']
+dataset = load_dataset('wikipedia', "20220301.en")['train']
+print(len(dataset))
 
 def process_dataitem_to_godb(data_item: dict, char_length: int):
     chop_length = min(len(data_item['text']),char_length)

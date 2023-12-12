@@ -1,2 +1,2 @@
-test_wiki (idx_data int, id int, url string, title string, articleStart embtext)
-wiki_1mill (idx_data int, id int, url string, title string, articleStart embtext)
+wiki_random_1000 (idx_data int, id int, url string, title string, articleStart embtext)
+wiki_random_10000 (idx_data int, id int, url string, title string, articleStart embtext)

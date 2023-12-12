@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -18,7 +19,9 @@ type WikiResponse struct {
 
 var portNumberWiki int = 7011
 
-func ConstructWikiHeapFile(tableName string, bp *BufferPool, resetFile bool, limit int) (*HeapFile, error) {
+const SIZE_WIKIPEDIA = 6458670
+
+func ConstructWikiHeapFile(tableName string, bp *BufferPool, resetFile bool, limit int, random bool) (*HeapFile, error) {
 
 	td := &TupleDesc{Fields: []FieldType{
 		{Fname: "idx_data", Ftype: IntType},
@@ -36,7 +39,7 @@ func ConstructWikiHeapFile(tableName string, bp *BufferPool, resetFile bool, lim
 			return nil, err
 		}
 		fmt.Println("Load from API")
-		err = hf.LoadFromAPI(portNumberWiki, limit)
+		err = hf.LoadFromAPI(portNumberWiki, limit, random)
 		if err != nil {
 			return nil, err
 		}
@@ -51,7 +54,13 @@ func ConstructWikiHeapFile(tableName string, bp *BufferPool, resetFile bool, lim
 	}
 }
 
-func (f *HeapFile) LoadFromAPI(portNumber int, limit int) error {
+func (f *HeapFile) LoadFromAPI(portNumber int, limit int, random bool) error {
+
+	//Random permutation of data points
+	var randPerm []int
+	if random {
+		randPerm = rand.Perm(SIZE_WIKIPEDIA)
+	}
 
 	desc := f.Descriptor()
 	if desc == nil || desc.Fields == nil {
@@ -61,8 +70,11 @@ func (f *HeapFile) LoadFromAPI(portNumber int, limit int) error {
 	var wikiresponse *WikiResponse
 	var err error
 	for counter < limit {
-		wikiresponse, err = getWikiElement(counter)
-
+		if random {
+			wikiresponse, err = getWikiElement(randPerm[counter])
+		} else {
+			wikiresponse, err = getWikiElement(counter)
+		}
 		if err != nil {
 			break //We might be at the end
 		}
