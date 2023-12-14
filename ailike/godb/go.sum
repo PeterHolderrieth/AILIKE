@@ -1,0 +1,6 @@
+github.com/manya-bansal/sqlparser v0.2.2 h1:YYei51qF7oUBbS3R4qczckRSzJyfToMjG5K0q15+naU=
+github.com/manya-bansal/sqlparser v0.2.2/go.mod h1:YsiCf9ANGjb20JdENDjMJRMtVSdYo+IwD6GWroh3ySU=
+github.com/mitchellh/hashstructure/v2 v2.0.2 h1:vGKWl0YJqUNxE8d+h8f6NJLcCJrgbhC4NcD46KavDd4=
+github.com/mitchellh/hashstructure/v2 v2.0.2/go.mod h1:MG3aRVU/N29oo/V/IhBX8GR/zz4kQkprJgF2EVszyDE=
+golang.org/x/exp v0.0.0-20231206192017-f3f8817b8deb h1:c0vyKkb6yr3KR7jEfJaOSv4lG7xPkbN6r52aJz1d8a8=
+golang.org/x/exp v0.0.0-20231206192017-f3f8817b8deb/go.mod h1:iRJReGqOEeBhDZGkGbynYwcHlctCvnjTYIamk7uXpHI=
