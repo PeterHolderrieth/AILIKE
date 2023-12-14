@@ -1,24 +1,25 @@
-# Running AILIKE
+# AILIKE
 
-## Step 1: Update to the new parser
-In the `go-db` run: 
+AILIKE is a SQL vector database built from scratch supporting efficient similarity search via IVFflat indexes and integration of LLMs into the database. In addition, we built a retrieval-augmented generation (RAG) system into the database that can query ChatGPT to fact-check.
+
+## Running AILIKE
+
+### Step 1: Setup the Go environment
+
+In the `go-db` directory run: 
 
 ```
 go get main
 go mod tidy
 ```
 
-You might also need the following additional commands within `godb`:
-```
-TODO
-```
+### Step 2: Run the python server for generating embeddings
 
-## Step 1: Run the python server for generating embeddings
-
-In the `/embedding` folder, start the python server by running:
+In the `/embedding` folder, start the python server by running in a different terminal (or tmux session):
+  `pip install -r requirements.txt`
   `python embedding.py`
 
-## Step 2: Starting GoDB
+### Step 3: Start GoDB
 
 In the `go-db` folder run:
 
@@ -26,7 +27,7 @@ In the `go-db` folder run:
 
 At this point, you will be able to start making ailike queries! You can skip to Step 4 if you already have data loaded.
 
-## Step 3 (Optional): Load the data
+### Step 4: Load the data
 You can use the \c command to load in a particular catalog. By default, GoDB will load in the tweets data catalog that matches the current embedding dimension configured in types.go.
 
 You can load in a particular catalog by doing:
@@ -58,7 +59,7 @@ examples:
 \i tweets_mini content 10 secondary ../data/tweets/tweets_384
 ```
 
-## Step 4
+### Step 4
 Perform queries! Examples: 
 
 - With a string literal: `select tweet_id, sentiment, (content ailike 'test string') sim from tweets_mini order by sim limit 5;`

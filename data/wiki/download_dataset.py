@@ -12,4 +12,4 @@ import os
 #dataset = load_dataset('wikipedia', "20220301.en", cache_dir='./')['train'] #, split='train')
 dataset = load_dataset('wikipedia', "20220301.en")['train'] #, split='train')
 
-print(dataset[0])
+print(dataset[16])

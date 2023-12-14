@@ -96,3 +96,45 @@ func BenchmarkingInfra(queryName string, query string, config BenchMetaData) (ti
 
 	return end, nil
 }
+
+func RunWikiArticleQuery(query string, c *Catalog, colNo int, bp *BufferPool) ([]int64, error) {
+	qType, plan, err := Parse(c, query)
+	if err != nil {
+		return nil, err
+	}
+	if plan == nil {
+		return nil, GoDBError{ParseError, "Plan was nil"}
+	}
+	if qType != IteratorType {
+		return nil, GoDBError{ParseError, "Plan is not of iterator type"}
+	}
+	desc := plan.Descriptor()
+	if desc == nil {
+		return nil, GoDBError{ParseError, "Descriptor was nil"}
+	}
+	tid := NewTID()
+	iter, err := plan.Iterator(tid)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []int64
+	// Run once to collect timing information
+	for {
+		tup, err := iter()
+
+		// Comment out this check while actually
+		// benchmarking, here right now for debugging help
+		if err != nil {
+			return nil, err
+		}
+		if tup == nil {
+			break
+		}
+		result = append(result, tup.Fields[colNo].(IntField).Value)
+	}
+
+	bp.CommitTransaction(tid)
+
+	return result, nil
+}

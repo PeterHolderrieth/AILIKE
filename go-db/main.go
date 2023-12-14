@@ -175,6 +175,29 @@ func main() {
 			case 'h':
 				fmt.Println(helpText)
 
+			case 'r':
+
+				splits := strings.Split(text, " | ")
+				fact := splits[0]
+				table := splits[1]
+				column_return := splits[2]
+				column_query := splits[3]
+				var use_context bool = false
+				if splits[4] == "true" {
+					use_context = true
+				}
+
+				query := fmt.Sprintf("SELECT %s,%s,('%s' AILIKE %s) sim FROM %s ORDER BY sim ASC LIMIT 1;", column_return, column_query, fact, column_query, table)
+				query_matches, err := godb.RunWikiArticleQuery(query, c, 0, bp)
+				if err != nil {
+					panic(err.Error())
+				}
+				result, err := godb.GenerateChatGPTFactCheck(fact, query_matches, use_context)
+				if err != nil {
+					panic(err.Error())
+				}
+				fmt.Println(result)
+
 			case 'l':
 				splits := strings.Split(text, " ")
 				table := splits[1]
