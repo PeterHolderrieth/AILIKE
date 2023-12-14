@@ -1,4 +1,4 @@
-"""Script that builds a python server that will be called from GoDB to fact-check statement."""
+"""Script that builds a python server that will be called from ailike to fact-check statement."""
 
 import openai
 import pandas as pd

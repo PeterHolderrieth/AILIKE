@@ -26,4 +26,4 @@ go.work
 data/transitdb/*
 data/tweets/tweets.dat
 
-go-db/godb/benchmark_results/ALL_TIMINGS.csv
+ailike/ailike/benchmark_results/ALL_TIMINGS.csv
